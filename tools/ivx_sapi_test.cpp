@@ -407,6 +407,21 @@ int wmain(int argc, wchar_t** argv)
             CoUninitialize();
             return 4;
         }
+        // Somewhere writable. The obvious default -- the current directory --
+        // is the install folder when this is run from where it is installed,
+        // and that needs an administrator, so every rate "failed" for a reason
+        // that had nothing to do with speech.
+        std::wstring scratch = positional.size() > 2 ? positional[2] : std::wstring();
+        if (scratch.empty()) {
+            wchar_t temp[MAX_PATH] = L"";
+            if (GetTempPathW(MAX_PATH, temp) > 0) {
+                scratch = std::wstring(temp) + L"Infovox23012_ratecheck.wav";
+            } else {
+                scratch = L"ratecheck.wav";
+            }
+        }
+        wprintf(L"writing each utterance to %s\n", scratch.c_str());
+
         int failures = 0;
         double previous = 0.0;
         // SAPI delivers no events when the output is a file stream, so the word
@@ -428,8 +443,7 @@ int wmain(int argc, wchar_t** argv)
             v->SetRate(r);
             v->SetVolume(100);
             v->SetInterest(SPFEI_ALL_EVENTS, SPFEI_ALL_EVENTS);
-            const std::wstring out = positional.size() > 2 ? positional[2] : L"";
-            ISpStream* stream = open_wav(v, out.empty() ? L"ratecheck.wav" : out);
+            ISpStream* stream = open_wav(v, scratch);
             EventTally tally;
             long bytes = 0;
             if (stream) {
@@ -443,7 +457,7 @@ int wmain(int argc, wchar_t** argv)
                 v->SetOutput(nullptr, FALSE);
                 stream->Close();
                 stream->Release();
-                bytes = file_size(out.empty() ? L"ratecheck.wav" : out);
+                bytes = file_size(scratch);
             }
             v->Release();
             token->Release();

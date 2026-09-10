@@ -77,6 +77,9 @@ private:
     bool feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSite* site);
     bool flush_quiet(ISpTTSEngineSite* site);
     void discard_quiet() { quiet_.clear(); }
+
+    // Bytes per sample frame of the output format, never zero.
+    unsigned block_align() const;
     void emit_word(const Run& run, uint32_t tagged_index, unsigned long stream_offset,
                    ISpTTSEngineSite* site);
     void emit_bookmark(uint32_t number, unsigned long stream_offset, ISpTTSEngineSite* site);
@@ -106,6 +109,11 @@ private:
     // position reported for that piece has to be shifted back by.
     bool leading_ = true;
     unsigned long lead_dropped_ = 0;
+
+    // Up to one sample short of a whole one, held back from the end of a chunk
+    // because the engine's chunk boundaries are not sample boundaries and the
+    // host will not accept a part sample. See feed_audio().
+    std::vector<BYTE> partial_;
     unsigned long stream_offset_ = 0;
     bool aborted_ = false;
 };

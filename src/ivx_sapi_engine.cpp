@@ -282,10 +282,22 @@ bool TtsEngine::write_bytes(const void* data, unsigned long bytes, ISpTTSEngineS
             return false;
         }
         ULONG written = 0;
-        const ULONG ask = static_cast<ULONG>((std::min)(remaining, piece));
+        ULONG ask = static_cast<ULONG>((std::min)(remaining, piece));
+        // Belt and braces: feed_audio already guarantees whole samples, and a
+        // partial one here is what Write rejects outright.
+        ask -= ask % block_align();
+        if (ask == 0) {
+            break;
+        }
         const HRESULT hr = site->Write(p, ask, &written);
         if (FAILED(hr)) {
-            IVX_ERROR("sapi: writing to the host failed: %s", hr_error(hr));
+            IVX_ERROR("sapi: writing to the host failed: %s (ask=%lu remaining=%lu of %lu, "
+                      "piece=%lu, stream_offset=%lu, written=%lu, fmt %lu Hz %u ch %u bit "
+                      "avg=%lu)",
+                      hr_error(hr), static_cast<unsigned long>(ask), remaining, bytes, piece,
+                      stream_offset_, static_cast<unsigned long>(written),
+                      static_cast<unsigned long>(format_.samples_per_sec), format_.channels,
+                      format_.bits, format_.avg_bytes_per_sec);
             aborted_ = true;
             return false;
         }
@@ -314,11 +326,54 @@ bool TtsEngine::flush_quiet(ISpTTSEngineSite* site)
     return write_bytes(held.data(), static_cast<unsigned long>(held.size()), site);
 }
 
+unsigned TtsEngine::block_align() const
+{
+    const unsigned channels = format_.channels ? format_.channels : 1;
+    const unsigned bytes_per_sample = format_.bits ? (format_.bits / 8u) : 2u;
+    const unsigned block = channels * bytes_per_sample;
+    return block ? block : 1;
+}
+
 bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSite* site)
 {
+    // The engine hands its audio over in whatever pieces its internal buffering
+    // produces, and those boundaries are not sample boundaries: at some speaking
+    // rates a chunk arrives that is an odd number of bytes, and at least once
+    // per utterance the chunk is a single byte.
+    //
+    // ISpTTSEngineSite::Write refuses anything that is not a whole number of
+    // samples -- E_INVALIDARG, with nothing written -- and this engine treats
+    // that as fatal to the utterance. Passed straight through, one stray byte
+    // therefore ended the utterance wherever it happened to fall: mid-word, or
+    // near the end, or after a few hundred bytes. It was the reason speech was
+    // cut off above about a quarter of the rate range.
+    //
+    // So the odd tail is kept and put on the front of the next chunk. What
+    // reaches Write is always whole samples.
+    std::vector<BYTE> joined;
+    const BYTE* p = static_cast<const BYTE*>(data);
+    if (!partial_.empty()) {
+        joined.reserve(partial_.size() + bytes);
+        joined.assign(partial_.begin(), partial_.end());
+        joined.insert(joined.end(), p, p + bytes);
+        partial_.clear();
+        p = joined.data();
+        bytes = static_cast<unsigned long>(joined.size());
+    }
+    const unsigned long tail = bytes % block_align();
+    if (tail) {
+        IVX_TRACE("sapi: %lu byte(s) of a part sample held for the next chunk", tail);
+        partial_.assign(p + bytes - tail, p + bytes);
+        bytes -= tail;
+    }
+    if (bytes == 0) {
+        return true;
+    }
+    data = p;
+
     // Only 16-bit PCM is inspected; anything else goes straight through, as
     // does everything when the user has asked to hear the engine untrimmed.
-    if (format_.bits != 16 || bytes < 2 ||
+    if (format_.bits != 16 ||
         (!settings_.trim_trailing_silence && !settings_.trim_leading_silence)) {
         return flush_quiet(site) && write_bytes(data, bytes, site);
     }
@@ -372,7 +427,6 @@ bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSi
 
     if (last_loud == count) {
         // Entirely quiet: hold it back in case this is the end of the utterance.
-        const BYTE* p = static_cast<const BYTE*>(data);
         quiet_.insert(quiet_.end(), p, p + bytes);
         return true;
     }
@@ -387,7 +441,6 @@ bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSi
         return false;
     }
     if (loud_bytes < bytes) {
-        const BYTE* p = static_cast<const BYTE*>(data);
         quiet_.assign(p + loud_bytes, p + bytes);
     }
     return true;
@@ -531,6 +584,7 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
 
     bookmarks_.clear();
     quiet_.clear();
+    partial_.clear();
     stream_offset_ = 0;
     aborted_ = false;
 

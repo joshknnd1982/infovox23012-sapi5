@@ -364,6 +364,24 @@ engine believes about itself, and it is what most of this wrapper was worked out
 from.
 
 
+What changed
+------------
+
+1.0.1  Speech is no longer cut off at higher speaking rates.
+
+       Above about a quarter of the rate range, words were cut off at the end
+       of an utterance and sometimes in the middle. The engine hands its audio
+       over in pieces whose boundaries are not sample boundaries, and at some
+       rates one of those pieces is a single byte. Windows speech refuses a
+       part sample outright, and that ended the utterance wherever the stray
+       byte happened to fall. It is now carried over to the next piece.
+
+       Check it on your own machine, with no administrator needed:
+         Infovox23012SapiTest rates
+
+1.0.0  First release: sixty voices in twelve languages, 32- and 64-bit.
+
+
 Diagnosing a problem
 --------------------
 
@@ -408,6 +426,9 @@ link in the chain:
                                            voice it registers for you alone and
                                            then removes. Needs no administrator,
                                            so it works before installing
+  Infovox23012SapiTest rates               speaks the same sentence at all
+                                           twenty-one speaking rates and checks
+                                           none of them is cut short
 
 
 Where this came from

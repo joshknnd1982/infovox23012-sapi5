@@ -161,6 +161,37 @@ with a pause in it gets two. That is dropped rather than played, and every audio
 position the engine reports is shifted back by however much was dropped, so word
 highlighting still lands on the right word.
 
+## Releases
+
+**1.0.1** — speech no longer stops mid-word above a quarter of the rate range.
+
+The engine hands its audio over in whatever pieces its internal buffering
+produces, and those boundaries are not sample boundaries: at some speaking rates
+a chunk arrives that is an odd number of bytes, and at least once per utterance
+that chunk is a single byte. `ISpTTSEngineSite::Write` refuses anything that is
+not a whole number of samples — `E_INVALIDARG`, nothing written — and the SAPI5
+engine treats a failed write as fatal to the utterance. Passed straight through,
+one stray byte ended the utterance wherever it happened to fall: mid-word, near
+the end, or after a few hundred bytes. Whether it fell at all depended on the
+rate, which is why it looked like a rate bug. The odd tail is now kept and put
+on the front of the next chunk, so what reaches `Write` is always whole samples.
+
+Measured, same twelve-word sentence, before and after:
+
+| SAPI rate | before | after |
+| --- | --- | --- |
+| 0 | 3.35 s | 3.35 s |
+| 2 | 0.04 s | 2.59 s |
+| 4 | 0.03 s | 2.07 s |
+| 6 | 0.07 s | 1.59 s |
+| 8 | 0.06 s | 1.27 s |
+
+`Infovox23012SapiTest rates` is the regression check: it speaks the same
+sentence at all twenty-one rate steps and fails if any of them is cut short.
+It needs no administrator.
+
+**1.0.0** — first release: sixty voices in twelve languages, 32- and 64-bit.
+
 ## Layout
 
 | Path | What it is |

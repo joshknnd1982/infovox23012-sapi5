@@ -9,6 +9,7 @@
 //                           [--volume N] [--xml]
 //   Infovox23012SapiTest all <outdir>
 //   Infovox23012SapiTest sandbox <out.wav> [text]  (no administrator needed)
+//   Infovox23012SapiTest rates                     every rate, checked
 //
 // Exit code 0 means audio was produced.
 
@@ -385,6 +386,93 @@ int wmain(int argc, wchar_t** argv)
     }
 
     wprintf(L"host is %d-bit\n", static_cast<int>(sizeof(void*) * 8));
+
+    // The regression test for the bug that made speech stop mid-word above
+    // about a quarter of the rate range.
+    //
+    // The engine's audio chunks do not always land on sample boundaries, and a
+    // part sample handed to ISpTTSEngineSite::Write is refused outright, which
+    // ends the utterance wherever it happens to fall. Whether it falls at all
+    // depends on the rate, so this walks the whole range and checks three things
+    // an utterance that was cut short cannot satisfy: every word is reported,
+    // the duration falls as the rate rises, and nothing gets shorter than the
+    // rate alone would explain.
+    if (!positional.empty() && positional[0] == L"rates") {
+        const std::wstring text =
+            positional.size() > 1
+                ? positional[1]
+                : L"One two three four five six seven eight nine ten eleven twelve.";
+        sandbox_remove();
+        if (!sandbox_install(L"Infovox 1.12 sandbox", want_mode, L"409")) {
+            CoUninitialize();
+            return 4;
+        }
+        int failures = 0;
+        double previous = 0.0;
+        // SAPI delivers no events when the output is a file stream, so the word
+        // column reads zero. It is printed anyway: a non-zero value would mean
+        // this ran differently from how it is described here.
+        wprintf(L"rate   bytes   seconds  words (a file stream carries none)\n");
+        for (int r = -10; r <= 10; ++r) {
+            ISpObjectToken* token = sandbox_token();
+            ISpVoice* v = nullptr;
+            if (!token || FAILED(CoCreateInstance(CLSID_SpVoice, nullptr, CLSCTX_ALL, IID_ISpVoice,
+                                                  reinterpret_cast<void**>(&v)))) {
+                if (token) {
+                    token->Release();
+                }
+                ++failures;
+                continue;
+            }
+            v->SetVoice(token);
+            v->SetRate(r);
+            v->SetVolume(100);
+            v->SetInterest(SPFEI_ALL_EVENTS, SPFEI_ALL_EVENTS);
+            const std::wstring out = positional.size() > 2 ? positional[2] : L"";
+            ISpStream* stream = open_wav(v, out.empty() ? L"ratecheck.wav" : out);
+            EventTally tally;
+            long bytes = 0;
+            if (stream) {
+                v->SetOutput(stream, TRUE);
+                if (SUCCEEDED(v->Speak(text.c_str(), SPF_ASYNC | SPF_IS_NOT_XML, nullptr))) {
+                    while (v->WaitUntilDone(50) == S_FALSE) {
+                        drain_events(v, &tally, false);
+                    }
+                    drain_events(v, &tally, false);
+                }
+                v->SetOutput(nullptr, FALSE);
+                stream->Close();
+                stream->Release();
+                bytes = file_size(out.empty() ? L"ratecheck.wav" : out);
+            }
+            v->Release();
+            token->Release();
+
+            // The shape of the curve is the test. Speech that stopped early is
+            // dramatically shorter than its neighbours -- when this bug was
+            // live, two seconds of speech came out as three hundredths -- and
+            // one rate step is only about a tenth, so nothing legitimate drops
+            // by half between neighbours or gets longer as the rate rises.
+            const double seconds = bytes > 44 ? (bytes - 44) / 32000.0 : 0.0;
+            const wchar_t* verdict = L"";
+            if (seconds < 0.5) {
+                verdict = L"  <-- TRUNCATED";
+                ++failures;
+            } else if (previous > 0.0 && seconds > previous + 0.02) {
+                verdict = L"  <-- LONGER THAN THE SLOWER RATE";
+                ++failures;
+            } else if (previous > 0.0 && seconds < previous * 0.6) {
+                verdict = L"  <-- MUCH SHORTER THAN THE RATE EXPLAINS";
+                ++failures;
+            }
+            previous = seconds;
+            wprintf(L"%4d %8ld %8.2f %6d%s\n", r, bytes, seconds, tally.words, verdict);
+        }
+        sandbox_remove();
+        wprintf(L"\n%s\n", failures ? L"FAILED" : L"Every rate speaks the whole utterance.");
+        CoUninitialize();
+        return failures ? 6 : 0;
+    }
 
     if (!positional.empty() && positional[0] == L"sandbox") {
         if (positional.size() < 2) {

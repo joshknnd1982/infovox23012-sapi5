@@ -105,6 +105,59 @@ private:
     bool* flag_;
 };
 
+// Asking Windows to leave this process's timer resolution alone, on the
+// versions of Windows that have an opinion about it.
+//
+// SetProcessInformation arrived in Windows 8 and the power-throttling class it
+// is used with here in Windows 10. Calling it by name is what broke Windows 7:
+// naming an import puts kernel32!SetProcessInformation in the import table, the
+// loader cannot resolve it, and the process is killed before the first
+// instruction of main. There is no error to handle and nothing in the log --
+// the worker was created and was simply gone, and every client that asked it to
+// speak waited six seconds and gave up. This is the only file that names the
+// API and only the worker and the 32-bit diagnostics link it, which is why
+// Windows 7 could still enumerate voices and register the engine, and only fell
+// silent when something asked for actual speech.
+//
+// So it is looked up instead of linked. The declarations are ours because the
+// build targets the Windows 7 SDK surface (see _WIN32_WINNT in CMakeLists.txt),
+// which does not declare any of this.
+constexpr DWORD kProcessPowerThrottling = 4;  // PROCESS_INFORMATION_CLASS
+constexpr ULONG kPowerThrottlingVersion1 = 1;
+constexpr ULONG kPowerThrottlingIgnoreTimerResolution = 0x4;
+
+struct PowerThrottlingState {
+    ULONG Version;
+    ULONG ControlMask;
+    ULONG StateMask;
+};
+
+// True only if Windows both had the call and accepted it: Windows 7 has no
+// SetProcessInformation at all, and Windows 8 through Windows 10 1703 have the
+// call but not this class, where it fails cleanly. Neither of those Windows
+// throttles a timer resolution it has been asked for, so there is nothing to
+// opt out of and nothing lost by the request not landing.
+bool exempt_from_timer_throttling()
+{
+    using SetProcessInformationFn = BOOL(WINAPI*)(HANDLE, DWORD, LPVOID, DWORD);
+    const HMODULE kernel32 = GetModuleHandleW(L"kernel32.dll");
+    const auto set_process_information = reinterpret_cast<SetProcessInformationFn>(
+        reinterpret_cast<void*>(kernel32 ? GetProcAddress(kernel32, "SetProcessInformation")
+                                         : nullptr));
+    if (!set_process_information) {
+        return false;
+    }
+
+    // ControlMask says which policy to speak about; StateMask 0 says "do not
+    // ignore this process's timer resolution".
+    PowerThrottlingState power = {};
+    power.Version = kPowerThrottlingVersion1;
+    power.ControlMask = kPowerThrottlingIgnoreTimerResolution;
+    power.StateMask = 0;
+    return set_process_information(GetCurrentProcess(), kProcessPowerThrottling, &power,
+                                   sizeof(power)) != FALSE;
+}
+
 }  // namespace
 
 // ---------------------------------------------------------------------------
@@ -601,14 +654,10 @@ bool Engine::load(const std::wstring& engine_dir, const Catalog& catalog)
         // whichever of the two you got was decided by whether the throttling
         // had taken hold. Opting out makes it 3.6 ms every time.
         //
-        // ControlMask says which policy to speak about; StateMask 0 says "do
-        // not ignore this process's timer resolution".
-        PROCESS_POWER_THROTTLING_STATE power = {};
-        power.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
-        power.ControlMask = PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION;
-        power.StateMask = 0;
-        const bool honoured = SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling,
-                                                    &power, sizeof(power)) != FALSE;
+        // Windows 7 and Windows 8 have no such throttling, so there is nothing
+        // to opt out of there and the call is not made at all; see
+        // exempt_from_timer_throttling().
+        const bool honoured = exempt_from_timer_throttling();
 
         timer_resolution_raised_ = timeBeginPeriod(1) == TIMERR_NOERROR;
         IVX_INFO("engine: multimedia timer resolution %s%s",

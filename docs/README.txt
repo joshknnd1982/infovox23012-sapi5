@@ -9,6 +9,9 @@ Languages: American English, British English, Danish, Dutch, Finnish, French,
 German, Icelandic, Italian, Norwegian, Castilian Spanish, Swedish.
 Speakers, in every language: Male, Female, Child, Giant, Zombie.
 
+Runs on Windows 7 Service Pack 1 and everything since, up to and including
+Windows 11, on both 32-bit and 64-bit Windows.
+
 The engine is Infovox 230 version 1.12, made by Telia Promotor AB and released
 in November 1998. This is a full copy: the demonstration mode is gone and there
 is no licence to install or expire. See "The demonstration mode" below.
@@ -366,6 +369,25 @@ from.
 
 What changed
 ------------
+
+1.0.4  The voices speak again on Windows 7.
+
+       On Windows 7, choosing an Infovox voice left you with no speech at
+       all. The voices appeared in the list and could be selected, and then
+       nothing was ever spoken -- the program that does the speaking could
+       not start, and every application that asked it to waited six seconds
+       and gave up.
+
+       1.0.3 had added a request to Windows 11 to stop it throttling that
+       program's timer, which is what made speech start promptly there. The
+       way it asked did not exist before Windows 8, and asking for something
+       that old Windows has never heard of stops the program from starting
+       at all rather than being refused. It is now asked for in a way that
+       older Windows can simply ignore. Windows 11 is unaffected.
+
+       Windows 7 SP1 through Windows 11 are all supported, and the program
+       is now built in a way that stops the build -- rather than somebody's
+       speech -- if anything newer than Windows 7 is ever used by accident.
 
 1.0.3  No click at the start of a voice, and speech is not lost when you
        change voice.

@@ -10,6 +10,12 @@ German, Icelandic, Italian, Norwegian, Castilian Spanish, Swedish — each with 
 Male, Female, Child, Giant and Zombie speaker. The installer offers them one at
 a time: any set of languages, and any set of voices inside each.
 
+Windows 7 SP1 through Windows 11, on 32-bit and 64-bit Windows alike. That range
+is held to at build time: everything is compiled against the Windows 7 header
+surface, so reaching for a newer API stops the build rather than shipping a
+binary that a Windows 7 machine will not start (see 1.0.4 below, which is what
+that rule is there to prevent).
+
 Installers are on the [releases page](https://github.com/joshknnd1982/infovox23012-sapi5/releases).
 
 ## This is the 1.12 engine, not the 2.2 one
@@ -162,6 +168,42 @@ position the engine reports is shifted back by however much was dropped, so word
 highlighting still lands on the right word.
 
 ## Releases
+
+**1.0.4** — the voices speak again on Windows 7.
+
+Reported as: "the engine completely crashes SAPI when I select one of the
+installed voices". The installation log said which Windows: `6.1.7601 SP1`.
+
+1.0.3 opted the worker out of Windows 11's timer throttling by calling
+`SetProcessInformation`, which arrived in Windows 8. Naming a function is what
+puts it in a binary's import table, and an import the loader cannot resolve is
+not a call that fails — it is a process Windows refuses to start. So on Windows 7
+the worker was created and was gone before the first instruction of `main`: no
+error code, no window, and nothing in the log, because the log is opened on that
+first line. Every client that asked it to speak waited six seconds, started
+another one, and after four tries gave up:
+
+```
+client: started the worker (C:\Program Files\Infovox23012\Infovox23012Server.exe)
+client: the worker never became reachable on \\.\pipe\Infovox23012TTS_1
+sapi: the worker did not answer; assuming 16000 Hz, 16-bit mono
+```
+
+Only `ivx_engine.cpp` names that API, and only the worker and the 32-bit
+diagnostics link it — which is why on Windows 7 the engine still registered and
+all fifteen voices still appeared in the voice list, and it was only speech that
+was missing. Everything the reporter could see worked.
+
+It is now looked up with `GetProcAddress` and skipped where it does not exist.
+Windows 11 still opts out and still starts speaking in about 4 ms; Windows 7 and
+8 have no such throttling, so there was never anything there to opt out of.
+
+*So it cannot happen again.* The build now compiles against the Windows 7 SP1
+header surface (`_WIN32_WINNT=0x0601`), which turns naming anything newer into a
+compile error rather than a machine that will not speak. It found nothing else —
+`SetProcessInformation` was the only one. Every shipped binary now imports
+nothing newer than Vista, in either architecture, and `dumpbin /imports` on
+`Infovox23012Server.exe` is how that is checked.
 
 **1.0.3** — no click at the start of a voice, and no lost speech when changing
 voice.

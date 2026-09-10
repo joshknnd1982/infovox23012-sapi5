@@ -35,7 +35,7 @@
 
 #define AppName "Infovox 230 v1.12 SAPI5 Voices"
 #define AppShortName "Infovox 230 v1.12"
-#define AppVersion "1.0.3"
+#define AppVersion "1.0.4"
 #define AppPublisher "infovox23012-sapi5 project"
 #define StageDir "..\output"
 
@@ -49,6 +49,12 @@ AppPublisher={#AppPublisher}
 ; be read from its properties without starting it.
 VersionInfoVersion={#AppVersion}
 VersionInfoProductName={#AppName}
+; Windows 7 SP1 is the oldest Windows the voices run on, and saying so is what
+; makes an old machine refuse the install cleanly instead of installing voices
+; that cannot speak. Inno Setup 6 happens to default to the same floor; it is
+; written down because it is a property of what is being installed, not
+; something to inherit from whichever Inno Setup built it.
+MinVersion=6.1sp1
 DefaultDirName={autopf}\Infovox23012
 DefaultGroupName={#AppShortName}
 OutputDir={#StageDir}

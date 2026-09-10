@@ -6,6 +6,10 @@ output
 # Generated: voice samples, and anything the engine's own logging leaves behind
 samples
 bin/engine/IVX230_*.LOG
+# infovox23012.log and an installer's install.log land here when a bug report
+# arrives with them attached. They are somebody else's machine -- their user
+# name and their folder names -- and this repository is public.
+*.log
 __pycache__/
 *.pyc
 

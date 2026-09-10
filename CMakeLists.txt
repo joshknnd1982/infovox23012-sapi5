@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Infovox23012SAPI VERSION 1.0.3 LANGUAGES CXX RC)
+project(Infovox23012SAPI VERSION 1.0.4 LANGUAGES CXX RC)
 
 # The Infovox 230 engine is a 32-bit dll, so the worker that owns it is always
 # x86. The SAPI5 engine itself is built twice -- 32-bit for 32-bit hosts and
@@ -32,6 +32,21 @@ add_compile_definitions(
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
+)
+
+# Windows 7 SP1 is the oldest Windows this runs on, and the Windows headers are
+# told so. Without this they declare whatever the installed SDK knows about, and
+# calling one of those by name is not a warning or a runtime failure that can be
+# handled -- it is an import the loader cannot resolve, so Windows 7 kills the
+# process before its first instruction. That is exactly what happened to the
+# worker in 1.0.3: it named a Windows 8 function, and on Windows 7 every attempt
+# to speak started a process that vanished. Pinning the version turns that
+# mistake into a compile error. Anything genuinely newer is looked up with
+# GetProcAddress and does without on the versions that lack it.
+add_compile_definitions(
+    _WIN32_WINNT=0x0601
+    WINVER=0x0601
+    NTDDI_VERSION=0x06010000
 )
 # Statically linked so a missing Visual C++ redistributable can never be the
 # reason a screen reader has no voice.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Infovox23012SAPI VERSION 1.1.1 LANGUAGES CXX)
+project(Infovox23012SAPI VERSION 1.0.0 LANGUAGES CXX RC)
 
 # The Infovox 230 engine is a 32-bit dll, so the worker that owns it is always
 # x86. The SAPI5 engine itself is built twice -- 32-bit for 32-bit hosts and
@@ -37,6 +37,30 @@ add_compile_definitions(
 # reason a screen reader has no voice.
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
+# Stamps a target with the product version, its own name and a description, so
+# Explorer's Properties -> Details says which build it is. src/ivx_version.h is
+# the single place the number lives; see the note there about never replacing a
+# release asset in place.
+function(ivx_version_stamp target description is_dll)
+    target_sources(${target} PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/ivx_version.rc)
+    get_target_property(_output ${target} OUTPUT_NAME)
+    if(NOT _output)
+        set(_output ${target})
+    endif()
+    if(is_dll)
+        set(_suffix ".dll")
+        set(_dllflag IVX_IS_DLL)
+    else()
+        set(_suffix ".exe")
+        set(_dllflag IVX_NOT_DLL)
+    endif()
+    target_compile_definitions(${target} PRIVATE
+        IVX_FILE_NAME="${_output}${_suffix}"
+        IVX_FILE_DESC="${description}"
+        ${_dllflag}
+    )
+endfunction()
+
 # ---------------------------------------------------------------------------
 # Shared by every target.
 # ---------------------------------------------------------------------------
@@ -63,6 +87,7 @@ add_library(Infovox23012SAPI SHARED
 )
 target_link_libraries(Infovox23012SAPI PRIVATE ivx_common ole32 oleaut32)
 set_target_properties(Infovox23012SAPI PROPERTIES OUTPUT_NAME "Infovox23012SAPI")
+ivx_version_stamp(Infovox23012SAPI "Infovox 230 v1.12 SAPI5 speech engine" TRUE)
 
 # Drives the finished engine through SAPI5 itself rather than through our own
 # interfaces, which is the only way to test what applications actually do. Built
@@ -71,6 +96,7 @@ set_target_properties(Infovox23012SAPI PROPERTIES OUTPUT_NAME "Infovox23012SAPI"
 add_executable(Infovox23012SapiTest tools/ivx_sapi_test.cpp)
 target_link_libraries(Infovox23012SapiTest PRIVATE ole32 oleaut32)
 target_include_directories(Infovox23012SapiTest PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+ivx_version_stamp(Infovox23012SapiTest "Infovox 230 v1.12 SAPI5 test harness" FALSE)
 
 # ---------------------------------------------------------------------------
 # 32-bit only: the worker that owns the engine, and the diagnostics tool.
@@ -81,6 +107,7 @@ if(NOT IVX_X64)
 
     add_executable(Infovox23012Server src/ivx_server.cpp)
     target_link_libraries(Infovox23012Server PRIVATE ivx_engine)
+    ivx_version_stamp(Infovox23012Server "Infovox 230 v1.12 speech engine worker" FALSE)
 
     # The configuration utility. 32-bit only and not because of the engine --
     # it never loads it -- but because there is no reason to ship two of a
@@ -95,6 +122,7 @@ if(NOT IVX_X64)
         src/ivx_config.rc
     )
     target_link_libraries(Infovox23012Config PRIVATE ivx_common comctl32 winmm shell32 ole32)
+    ivx_version_stamp(Infovox23012Config "Infovox 230 v1.12 configuration utility" FALSE)
 endif()
 
 # Diagnostics are built for both architectures. The 32-bit one can drive the
@@ -107,6 +135,7 @@ else()
     target_link_libraries(Infovox23012Diag PRIVATE ivx_engine)
     target_compile_definitions(Infovox23012Diag PRIVATE IVX_HAVE_ENGINE)
 endif()
+ivx_version_stamp(Infovox23012Diag "Infovox 230 v1.12 diagnostics" FALSE)
 
 # ---------------------------------------------------------------------------
 # Staging: everything the installer packages, in the layout it installs.

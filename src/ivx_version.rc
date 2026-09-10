@@ -1,0 +1,60 @@
+// VERSIONINFO for every binary in the product.
+//
+// One resource script, compiled once per target, with the target's own name and
+// description supplied as preprocessor definitions from CMake (IVX_FILE_NAME
+// and IVX_FILE_DESC). Without this a support question begins with "which build
+// have you got?" and has no answer; with it, right-click, Properties, Details.
+
+#include <winver.h>
+
+#include "ivx_version.h"
+
+#ifndef IVX_FILE_NAME
+#define IVX_FILE_NAME "Infovox23012"
+#endif
+#ifndef IVX_FILE_DESC
+#define IVX_FILE_DESC "Infovox 230 v1.12 SAPI5"
+#endif
+
+#ifdef IVX_IS_DLL
+#define IVX_FILE_TYPE VFT_DLL
+#else
+#define IVX_FILE_TYPE VFT_APP
+#endif
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION IVX_VERSION_MAJOR, IVX_VERSION_MINOR, IVX_VERSION_PATCH, 0
+PRODUCTVERSION IVX_VERSION_MAJOR, IVX_VERSION_MINOR, IVX_VERSION_PATCH, 0
+FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+FILEFLAGS VS_FF_DEBUG
+#else
+FILEFLAGS 0x0L
+#endif
+FILEOS VOS_NT_WINDOWS32
+FILETYPE IVX_FILE_TYPE
+FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0"  // US English, Unicode
+        BEGIN
+            VALUE "CompanyName", "infovox23012-sapi5 project"
+            VALUE "FileDescription", IVX_FILE_DESC
+            VALUE "FileVersion", IVX_VERSION_STRING
+            VALUE "InternalName", IVX_FILE_NAME
+            VALUE "OriginalFilename", IVX_FILE_NAME
+            VALUE "ProductName", "Infovox 230 v1.12 SAPI5 Voices"
+            VALUE "ProductVersion", IVX_VERSION_STRING
+            VALUE "Comments",
+                  "SAPI5 wrapper for the " IVX_ENGINE_VERSION
+                  " speech engine. https://github.com/joshknnd1982/infovox23012-sapi5"
+            VALUE "LegalCopyright",
+                  "GPL. The Infovox 230 engine itself was made by Telia Promotor AB."
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END

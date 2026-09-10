@@ -73,7 +73,7 @@ if not defined ISCC (
 
 "%ISCC%" "%ROOT%installer\Infovox23012SAPI.iss" || exit /b 1
 echo.
-echo Installer: %STAGE%\Infovox23012SAPI_Setup.exe
+for %%f in ("%STAGE%\Infovox23012SAPI_Setup_*.exe") do echo Installer: %%f
 
 :done
 echo.

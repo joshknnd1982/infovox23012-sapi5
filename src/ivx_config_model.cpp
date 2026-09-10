@@ -333,6 +333,7 @@ bool VoiceFile::save(std::wstring* error)
         {settings_key::kTrimLeadingSilence, settings_.trim_leading_silence},
         {settings_key::kWordEvents, settings_.word_events},
         {settings_key::kSentenceEvents, settings_.sentence_events},
+        {settings_key::kCollapseRepeatedPunctuation, settings_.collapse_repeated_punctuation},
     };
     for (const Flag& item : flags) {
         ok = write_key(path_, section, item.key, item.value ? L"1" : L"0", &problem) && ok;

@@ -169,6 +169,59 @@ highlighting still lands on the right word.
 
 ## Releases
 
+**1.0.5** — an ellipsis no longer stops the voice for three seconds.
+
+Reported as: "when the engine encounters a word followed by an ellipsis there is
+a 3000 ms delay before the next word is spoken."
+
+The engine pads about eight tenths of a second after every sentence end, and
+keeps no memory of having just done it. `...` is three sentence ends in a row, so
+it gets three lots of padding — in the middle of a sentence, where it is not
+heard as a pause but as speech having stopped. Measured through SAPI5, `Hello...
+world` against `Hello. world`:
+
+| SAPI rate | full stop | ellipsis, before | ellipsis, now |
+| --- | --- | --- | --- |
+| −10 | 8906 ms | 24906 ms | **8904 ms** |
+| −5 | 2872 ms | 8032 ms | **2868 ms** |
+| 0 | 890 ms | 2490 ms | **889 ms** |
+| +5 | 479 ms | 1338 ms | **476 ms** |
+| +10 | 267 ms | 747 ms | **265 ms** |
+
+A run of two or more full stops, question marks or exclamation marks is now
+spoken as one of them, so an ellipsis costs exactly what a single full stop
+costs, at every rate. `?!?!` and `!!!` were the same fault and are fixed with it.
+`3.14` and `e.g.` are runs of one and are untouched, as is a run being spelled
+out, where each mark is its own word. `CollapseRepeatedPunctuation=0` restores
+the engine's own behaviour.
+
+The single ellipsis character `…` had the opposite fault — the engine has never
+heard of it and produced no pause at all, not even a short one — so it is now
+given the full stop it stands for and sounds like the typed spelling.
+
+*Why the punctuation and not the silence.* Shortening the silence on the way out
+is the obvious fix, gives an exact millisecond bound, and does not work. The
+engine reports where it is in the text **ahead** of the audio for it: measured, it
+named the word after the pause while the pause itself was still arriving. Audio
+removed after that is too late to correct a position already reported, and the
+word events came out both in the wrong order and past the end of the stream —
+
+```
+word at source offset 9  ... stream offset 88000     <- "bravo", queued first
+pause shortened by 48592 byte(s)
+word at source offset 15 ... stream offset 46768     <- "charlie", earlier!
+Speak finished, 70524 bytes written                  <- 88000 is past the end
+```
+
+which is a screen reader highlighting the wrong word. Never asking for the extra
+pauses leaves every position the engine reports true and needs no correction at
+all; the same trace now reads 0, 36800, 44160 against a 67916-byte stream, with
+the source offsets of the text as the application wrote it.
+
+The cost of choosing it is that the bound is a full stop rather than a number of
+milliseconds: at the two slowest rate settings an ellipsis still pauses for
+several seconds, because that is what an ordinary full stop does there.
+
 **1.0.4** — the voices speak again on Windows 7.
 
 Reported as: "the engine completely crashes SAPI when I select one of the
@@ -396,7 +449,19 @@ the engine's own alphabet — which is what a pronunciation dictionary uses.
 
 Does not work, and is handled here instead: `\Pau=` produces no pause at all
 (`\Pau=1000\` gives audio the same length as no tag), so silence is generated as
-exact PCM; the engine reports no viseme information, so none is offered.
+exact PCM; the engine reports no viseme information, so none is offered; a run of
+sentence ends stacks a pause for each one and `…` gets none at all, so a run is
+spoken as one mark and `…` as a full stop.
+
+Two more measured facts about it that decide how it has to be driven:
+
+- The engine reports where it is in the text **ahead** of the audio for it — it
+  names the word after a pause while the pause is still arriving. Anything that
+  removes audio after the fact therefore cannot correct the positions already
+  reported. See 1.0.5.
+- It pads after every sentence end without noticing it has just done so, so the
+  padding stacks; the padding after the last one is the trailing silence that
+  gets trimmed.
 
 Two more things worth knowing:
 

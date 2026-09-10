@@ -1016,6 +1016,11 @@ const wchar_t kEngineHint[] =
     L"voices -- Castilian Spanish most obviously, and some French and Italian ones -- start "
     L"so abruptly that it is heard as a click. Set it to 0 to hear the engine untouched.\r\n"
     L"\r\n"
+    L"Speaking a run of full stops as one is what keeps an ellipsis from stopping the voice. "
+    L"The engine pauses after every full stop and does not notice that it has just done so, "
+    L"so \"wait...\" is three pauses one after another -- two and a half seconds at the normal "
+    L"rate, and twenty-five at the slowest. An ordinary full stop is untouched either way.\r\n"
+    L"\r\n"
     L"Word and sentence positions are what a program uses to highlight the word being "
     L"spoken. Turning them off is worth trying if a program's highlighting is more trouble "
     L"than it is worth.\r\n"
@@ -1039,6 +1044,8 @@ void put_engine_values(HWND dlg, const EngineSettings& settings, int log_level)
     CheckDlgButton(dlg, IDC_E_TRIM, settings.trim_trailing_silence ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(dlg, IDC_E_TRIM_LEAD,
                    settings.trim_leading_silence ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(dlg, IDC_E_COLLAPSE,
+                   settings.collapse_repeated_punctuation ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(dlg, IDC_E_WORDS, settings.word_events ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(dlg, IDC_E_SENTENCES, settings.sentence_events ? BST_CHECKED : BST_UNCHECKED);
     set_spin(dlg, IDC_E_THRESHOLD_SPIN, 0, 1000, settings.silence_threshold);
@@ -1100,6 +1107,8 @@ INT_PTR CALLBACK engine_proc(HWND dlg, UINT message, WPARAM wparam, LPARAM lpara
                     s.trim_trailing_silence = IsDlgButtonChecked(dlg, IDC_E_TRIM) == BST_CHECKED;
                     s.trim_leading_silence =
                         IsDlgButtonChecked(dlg, IDC_E_TRIM_LEAD) == BST_CHECKED;
+                    s.collapse_repeated_punctuation =
+                        IsDlgButtonChecked(dlg, IDC_E_COLLAPSE) == BST_CHECKED;
                     s.word_events = IsDlgButtonChecked(dlg, IDC_E_WORDS) == BST_CHECKED;
                     s.sentence_events = IsDlgButtonChecked(dlg, IDC_E_SENTENCES) == BST_CHECKED;
                     s.silence_threshold =

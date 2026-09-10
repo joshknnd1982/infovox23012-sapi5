@@ -35,6 +35,18 @@ struct EngineSettings {
     // 32767. The padding being trimmed sits at plus or minus one.
     int silence_threshold = 16;
 
+    // Whether a run of two or more full stops, question marks or exclamation
+    // marks is spoken as one of them, and the one-character ellipsis as a full
+    // stop.
+    //
+    // The engine pauses after every sentence end and keeps no memory of having
+    // just done it, so "wait..." is three sentence ends in a row and three
+    // pauses: two and a half seconds at the normal rate, twenty-five at the
+    // slowest, in the middle of a sentence. A single full stop is untouched
+    // either way. Turn this off to hear exactly what the engine makes of the
+    // punctuation it is given.
+    bool collapse_repeated_punctuation = true;
+
     // How long a fade to put on the front of each piece of speech, in
     // milliseconds. The engine starts some voices abruptly -- Castilian Spanish
     // goes from digital silence to a third of full scale in ten samples, which
@@ -79,6 +91,7 @@ extern const wchar_t kSection[];
 extern const wchar_t kTrimTrailingSilence[];
 extern const wchar_t kTrimLeadingSilence[];
 extern const wchar_t kSilenceThreshold[];
+extern const wchar_t kCollapseRepeatedPunctuation[];
 extern const wchar_t kOnsetFadeMs[];
 extern const wchar_t kWordEvents[];
 extern const wchar_t kSentenceEvents[];

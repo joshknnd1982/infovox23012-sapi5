@@ -41,13 +41,60 @@ std::string narrow(const std::wstring& s)
     return out;
 }
 
+// The marks the engine treats as the end of a sentence, and pauses after.
+bool is_sentence_end(wchar_t ch)
+{
+    return ch == L'.' || ch == L'?' || ch == L'!';
+}
+
+// The single character for an ellipsis, which the engine has never heard of.
+constexpr wchar_t kEllipsis = 0x2026;
+
 // Appends text, escaping anything the engine would read as the start of a
 // control tag, and records where each character came from.
+//
+// `collapse` folds a run of two or more sentence-ending marks down to the first
+// of them, and spells the one-character ellipsis as the full stop it stands for.
+//
+// The engine pauses for about eight tenths of a second after every sentence end
+// and keeps no memory of having just done it, so "wait..." is three sentence
+// ends in a row and costs three pauses: two and a half seconds at the normal
+// rate, and twenty-five at the slowest. In the middle of a sentence that is not
+// heard as a pause but as speech having stopped.
+//
+// It is folded here, on the way in, rather than by shortening the silence on the
+// way out -- which was tried first and does not work. The engine reports where
+// it is in the text ahead of the audio for it: measured, it named the word after
+// the pause while the pause itself was still arriving. Audio taken out after
+// that is too late to correct a position already reported, and the word events
+// come out in the wrong order and past the end of the stream, which is a screen
+// reader highlighting the wrong word. Never asking for the extra pauses leaves
+// every position the engine reports true, and needs no correction at all.
+//
+// A single full stop is left alone, so ordinary sentences pause exactly as they
+// did. So is a run that is being spelled out, where each mark is its own word.
 void append_text(std::wstring& tagged, std::vector<uint32_t>& source, const wchar_t* text,
-                 ULONG length, ULONG src_base)
+                 ULONG length, ULONG src_base, bool collapse)
 {
+    bool after_sentence_end = false;
     for (ULONG i = 0; i < length; ++i) {
-        const wchar_t ch = text[i];
+        wchar_t ch = text[i];
+
+        // U+2026 and "..." are the same punctuation mark and should sound alike.
+        // The engine says nothing at all for U+2026 -- not even a short pause --
+        // so it is given the full stop it stands for.
+        if (collapse && ch == kEllipsis) {
+            ch = L'.';
+        }
+        if (collapse && is_sentence_end(ch)) {
+            if (after_sentence_end) {
+                continue;  // the pause for this one has already been asked for
+            }
+            after_sentence_end = true;
+        } else {
+            after_sentence_end = false;
+        }
+
         if (ch == L'\\') {
             tagged += L"\\\\";
             source.push_back(src_base + i);
@@ -790,12 +837,12 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
             // is done by separating the characters here.
             for (ULONG i = 0; i < frag->ulTextLen; ++i) {
                 append_text(current.run.tagged, current.run.source, frag->pTextStart + i, 1,
-                            frag->ulTextSrcOffset + i);
+                            frag->ulTextSrcOffset + i, false);
                 append_tag(current.run.tagged, current.run.source, L" ");
             }
         } else {
             append_text(current.run.tagged, current.run.source, frag->pTextStart, frag->ulTextLen,
-                        frag->ulTextSrcOffset);
+                        frag->ulTextSrcOffset, settings_.collapse_repeated_punctuation);
         }
     }
     flush();

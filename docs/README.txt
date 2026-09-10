@@ -175,6 +175,10 @@ no mouth-shape (viseme) information for talking-head animation, and its own
 pause tag does nothing. Pauses asked for in speech markup are produced by
 inserting real silence instead, which also makes their length exact.
 
+The engine also pauses after every full stop without noticing that it has just
+done so, so "..." would be three pauses one after another. A run of full stops,
+question marks or exclamation marks is spoken as one of them; see 1.0.5 below.
+
 One thing worth knowing about the sound: the engine surrounds every utterance
 with inaudible padding -- about a tenth of a second before and eight tenths of a
 second after. Left alone that is dead air before and after everything a screen
@@ -369,6 +373,26 @@ from.
 
 What changed
 ------------
+
+1.0.5  An ellipsis no longer stops the voice for three seconds.
+
+       A word followed by "..." was followed by about two and a half
+       seconds of silence before the next word, and more than that at
+       slower speeds. The engine pauses after every full stop and does not
+       notice that it has just done so, so three of them in a row meant
+       three pauses one after another -- in the middle of a sentence, where
+       it is not heard as a pause but as speech having stopped.
+
+       A run of two or more full stops, question marks or exclamation marks
+       is now spoken as one of them, so an ellipsis costs what a single
+       full stop costs. "?!?!" and "!!!" were the same thing and are fixed
+       with it. A single full stop is untouched, and so are "3.14" and
+       "e.g.". Turn off "Speak a run of full stops... as one" on the Engine
+       settings page to hear exactly what the engine makes of it.
+
+       The single ellipsis character had the opposite fault -- the engine
+       has never heard of it and paused not at all -- and now sounds like
+       the typed spelling.
 
 1.0.4  The voices speak again on Windows 7.
 

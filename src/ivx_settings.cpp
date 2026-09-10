@@ -12,6 +12,7 @@ const wchar_t kSection[] = L"Settings";
 const wchar_t kTrimTrailingSilence[] = L"TrimTrailingSilence";
 const wchar_t kTrimLeadingSilence[] = L"TrimLeadingSilence";
 const wchar_t kSilenceThreshold[] = L"SilenceThreshold";
+const wchar_t kCollapseRepeatedPunctuation[] = L"CollapseRepeatedPunctuation";
 const wchar_t kOnsetFadeMs[] = L"OnsetFadeMs";
 const wchar_t kWordEvents[] = L"WordEvents";
 const wchar_t kSentenceEvents[] = L"SentenceEvents";
@@ -94,6 +95,8 @@ void EngineSettings::merge_from(const std::wstring& ini_path)
     read_bool(ini_path, settings_key::kTrimLeadingSilence, &trim_leading_silence);
     read_int(ini_path, settings_key::kOnsetFadeMs, &onset_fade_ms);
     read_int(ini_path, settings_key::kSilenceThreshold, &silence_threshold);
+    read_bool(ini_path, settings_key::kCollapseRepeatedPunctuation,
+              &collapse_repeated_punctuation);
     read_bool(ini_path, settings_key::kWordEvents, &word_events);
     read_bool(ini_path, settings_key::kSentenceEvents, &sentence_events);
     read_int(ini_path, settings_key::kTimeoutBaseMs, &timeout_base_ms);
@@ -132,10 +135,11 @@ void EngineSettings::merge_from(const std::wstring& ini_path)
         timeout_per_char_ms = 0;
     }
 
-    IVX_INFO("settings: read from %S (trim lead=%d trail=%d level=%d words=%d sentences=%d "
+    IVX_INFO("settings: read from %S (trim lead=%d trail=%d level=%d collapse=%d words=%d "
+             "sentences=%d "
              "timeout=%d+%d rate=%d..%d/%d pitch=%d..%d/%d)",
              ini_path.c_str(), trim_leading_silence ? 1 : 0, trim_trailing_silence ? 1 : 0,
-             silence_threshold,
+             silence_threshold, collapse_repeated_punctuation ? 1 : 0,
              word_events ? 1 : 0, sentence_events ? 1 : 0, timeout_base_ms, timeout_per_char_ms,
              rate_min, rate_max, rate_default, pitch_min, pitch_max, pitch_default);
 }

@@ -152,12 +152,12 @@ END
 /////////////////////////////////////////////////////////////////////////////
 // Everything that is not a property of one voice.
 
-IDD_ENGINE DIALOGEX 0, 0, 463, 318
+IDD_ENGINE DIALOGEX 0, 0, 463, 336
 STYLE DS_SETFONT | DS_MODALFRAME | DS_CENTER | WS_POPUP | WS_CAPTION | WS_SYSMENU
 CAPTION "Engine settings"
 FONT 9, "Segoe UI", 400, 0, 1
 BEGIN
-    GROUPBOX        "Sound", -1, 7, 4, 220, 78
+    GROUPBOX        "Sound", -1, 7, 4, 220, 96
     CONTROL         "&Trim the inaudible padding at the end of every utterance",
                     IDC_E_TRIM, "Button", BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP,
                     14, 15, 206, 18
@@ -169,22 +169,27 @@ BEGIN
     CONTROL         "", IDC_E_THRESHOLD_SPIN, "msctls_updown32",
                     UDS_AUTOBUDDY | UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS |
                     UDS_NOTHOUSANDS | WS_CHILD | WS_VISIBLE | WS_TABSTOP, 0, 0, 10, 12
+    LTEXT           "&Onset fade, milliseconds, 0 to 50:", -1, 14, 74, 150, 16
+    EDITTEXT        IDC_E_ONSET_FADE, 170, 76, 44, 12, ES_AUTOHSCROLL | ES_NUMBER | WS_TABSTOP
+    CONTROL         "", IDC_E_ONSET_FADE_SPIN, "msctls_updown32",
+                    UDS_AUTOBUDDY | UDS_SETBUDDYINT | UDS_ALIGNRIGHT | UDS_ARROWKEYS |
+                    UDS_NOTHOUSANDS | WS_CHILD | WS_VISIBLE | WS_TABSTOP, 0, 0, 10, 12
 
-    GROUPBOX        "Reporting where the engine is in the text", -1, 7, 86, 220, 48
+    GROUPBOX        "Reporting where the engine is in the text", -1, 7, 104, 220, 48
     CONTROL         "Report &word positions while speaking", IDC_E_WORDS, "Button",
-                    BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP, 14, 100, 206, 14
+                    BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP, 14, 118, 206, 14
     CONTROL         "Report s&entence positions while speaking", IDC_E_SENTENCES, "Button",
-                    BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP, 14, 116, 206, 14
+                    BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP, 14, 134, 206, 14
 
-    GROUPBOX        "Waiting for the engine", -1, 7, 138, 220, 52
-    LTEXT           "&Give up on an utterance after, in milliseconds:", -1, 14, 151, 150, 16
-    EDITTEXT        IDC_E_TIMEOUT, 170, 153, 44, 12, ES_AUTOHSCROLL | ES_NUMBER | WS_TABSTOP
-    LTEXT           "...plus this many per &character:", -1, 14, 171, 150, 8
-    EDITTEXT        IDC_E_TIMEOUT_PER_CHAR, 170, 169, 44, 12, ES_AUTOHSCROLL | ES_NUMBER | WS_TABSTOP
+    GROUPBOX        "Waiting for the engine", -1, 7, 156, 220, 52
+    LTEXT           "&Give up on an utterance after, in milliseconds:", -1, 14, 169, 150, 16
+    EDITTEXT        IDC_E_TIMEOUT, 170, 171, 44, 12, ES_AUTOHSCROLL | ES_NUMBER | WS_TABSTOP
+    LTEXT           "...plus this many per &character:", -1, 14, 189, 150, 8
+    EDITTEXT        IDC_E_TIMEOUT_PER_CHAR, 170, 187, 44, 12, ES_AUTOHSCROLL | ES_NUMBER | WS_TABSTOP
 
-    GROUPBOX        "Logging", -1, 7, 194, 220, 40
-    LTEXT           "&Log detail:", -1, 14, 210, 60, 8
-    COMBOBOX        IDC_E_LOGLEVEL, 78, 208, 140, 140, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    GROUPBOX        "Logging", -1, 7, 212, 220, 40
+    LTEXT           "&Log detail:", -1, 14, 228, 60, 8
+    COMBOBOX        IDC_E_LOGLEVEL, 78, 226, 140, 140, CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
 
     GROUPBOX        "How far the rate and pitch controls reach", -1, 236, 4, 220, 124
     LTEXT           "Zero in any of these means: use what the engine reports for itself.",
@@ -206,11 +211,11 @@ BEGIN
     LTEXT           "Sentence spoken by &Preview:", -1, 243, 144, 206, 8
     EDITTEXT        IDC_E_PREVIEW_TEXT, 243, 156, 206, 12, ES_AUTOHSCROLL | WS_TABSTOP
 
-    LTEXT           "About t&hese settings (read only):", -1, 7, 240, 200, 8
-    EDITTEXT        IDC_E_HINT, 7, 250, 449, 42,
+    LTEXT           "About t&hese settings (read only):", -1, 7, 258, 200, 8
+    EDITTEXT        IDC_E_HINT, 7, 268, 449, 42,
                     ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP
 
-    PUSHBUTTON      "Put everything back to its &default", IDC_E_DEFAULTS, 7, 298, 130, 14
-    DEFPUSHBUTTON   "OK", IDOK, 345, 298, 50, 14
-    PUSHBUTTON      "Cancel", IDCANCEL, 403, 298, 53, 14
+    PUSHBUTTON      "Put everything back to its &default", IDC_E_DEFAULTS, 7, 316, 130, 14
+    DEFPUSHBUTTON   "OK", IDOK, 345, 316, 50, 14
+    PUSHBUTTON      "Cancel", IDCANCEL, 403, 316, 53, 14
 END

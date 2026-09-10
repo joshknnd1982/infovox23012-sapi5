@@ -1,6 +1,7 @@
 #include "ivx_sapi_engine.h"
 
 #include <algorithm>
+#include <cmath>
 
 #include "ivx_log.h"
 #include "ivx_sapi_tokens.h"
@@ -326,6 +327,33 @@ bool TtsEngine::flush_quiet(ISpTTSEngineSite* site)
     return write_bytes(held.data(), static_cast<unsigned long>(held.size()), site);
 }
 
+// Scales the opening samples of a piece up from nothing, in place in a scratch
+// buffer, and points `data` at it. Raised cosine rather than a straight line:
+// a linear ramp has a corner at each end, and a corner is what a click is.
+//
+// The buffer the worker hands over is reused, so it cannot be modified where it
+// lies. The scratch copy lives as long as this object; only the first few
+// milliseconds of an utterance ever pass through here.
+void TtsEngine::apply_onset_fade(const void*& data, unsigned long bytes)
+{
+    const size_t count = bytes / sizeof(short);
+    if (count == 0) {
+        return;
+    }
+    fade_scratch_.assign(static_cast<const short*>(data),
+                         static_cast<const short*>(data) + count);
+
+    const size_t n = (std::min)(count, static_cast<size_t>(fade_remaining_));
+    for (size_t i = 0; i < n; ++i) {
+        const size_t done = fade_total_ - fade_remaining_ + i;
+        const double phase = static_cast<double>(done) / fade_total_;
+        const double gain = 0.5 - 0.5 * cos(phase * 3.14159265358979);
+        fade_scratch_[i] = static_cast<short>(fade_scratch_[i] * gain);
+    }
+    fade_remaining_ -= static_cast<unsigned long>(n);
+    data = fade_scratch_.data();
+}
+
 unsigned TtsEngine::block_align() const
 {
     const unsigned channels = format_.channels ? format_.channels : 1;
@@ -412,6 +440,21 @@ bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSi
         leading_ = false;
         data = static_cast<const BYTE*>(data) + dropped;
         bytes -= dropped;
+    }
+
+    // Some voices start abruptly. Castilian Spanish goes from digital silence
+    // to a fifth of full scale within ten samples -- 0, 32, 219, 723, 1549,
+    // 2452, ... 6455 -- which is heard as a click at the start of every
+    // utterance. American English, by contrast, opens at -21 and eases in. The
+    // step is the engine's own, not something the trimming caused: the samples
+    // immediately before it are exact zeros.
+    //
+    // A fade of a few milliseconds over the opening takes the edge off without
+    // softening the speech; measured, it brings the sharpest step in the first
+    // ten milliseconds of the Spanish voices down from about 2000 to about 150,
+    // which is where the voices that never clicked already sat.
+    if (fade_remaining_ > 0 && format_.bits == 16) {
+        apply_onset_fade(data, bytes);
     }
 
     // `data` has just moved; everything below indexes from here, and reading
@@ -515,6 +558,16 @@ HRESULT TtsEngine::run_action(const Action& action, ISpTTSEngineSite* site)
     // looking for one again.
     leading_ = true;
     lead_dropped_ = 0;
+
+    // Each piece the engine speaks has an onset of its own, so each gets its
+    // own fade. Worked out here rather than per chunk so a sample rate the
+    // engine reported late cannot leave it stale.
+    fade_total_ = settings_.onset_fade_ms > 0
+                      ? static_cast<unsigned long>(
+                            (static_cast<unsigned long long>(format_.samples_per_sec) *
+                             settings_.onset_fade_ms) / 1000)
+                      : 0;
+    fade_remaining_ = fade_total_;
 
     auto on_audio = [&](const void* data, unsigned long bytes) -> bool {
         return feed_audio(data, bytes, site);

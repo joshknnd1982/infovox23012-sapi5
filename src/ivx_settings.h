@@ -35,6 +35,14 @@ struct EngineSettings {
     // 32767. The padding being trimmed sits at plus or minus one.
     int silence_threshold = 16;
 
+    // How long a fade to put on the front of each piece of speech, in
+    // milliseconds. The engine starts some voices abruptly -- Castilian Spanish
+    // goes from digital silence to a third of full scale in ten samples, which
+    // is heard as a click at the start of every utterance -- and a fade a few
+    // milliseconds long removes it without softening the speech. 0 turns it off
+    // and gives exactly what the engine produced.
+    int onset_fade_ms = 4;
+
     // Whether the engine reports where it is in the text. Word positions are
     // what a program uses to highlight the word being spoken.
     bool word_events = true;
@@ -71,6 +79,7 @@ extern const wchar_t kSection[];
 extern const wchar_t kTrimTrailingSilence[];
 extern const wchar_t kTrimLeadingSilence[];
 extern const wchar_t kSilenceThreshold[];
+extern const wchar_t kOnsetFadeMs[];
 extern const wchar_t kWordEvents[];
 extern const wchar_t kSentenceEvents[];
 extern const wchar_t kTimeoutBaseMs[];

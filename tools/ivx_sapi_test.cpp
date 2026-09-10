@@ -302,6 +302,55 @@ long find_repeated_audio(const std::wstring& path)
     return -1;
 }
 
+// How long the sound takes to come up from silence, as a fraction of the
+// loudest point in the recording. Returns milliseconds to a tenth and a quarter.
+void measure_rise(const std::wstring& path, double* to10, double* to25)
+{
+    *to10 = *to25 = 0;
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, path.c_str(), L"rb") != 0 || !f) {
+        return;
+    }
+    fseek(f, 0, SEEK_END);
+    const long size = ftell(f);
+    if (size <= 44) {
+        fclose(f);
+        return;
+    }
+    std::vector<short> pcm(static_cast<size_t>(size - 44) / sizeof(short));
+    fseek(f, 44, SEEK_SET);
+    const size_t read = fread(pcm.data(), sizeof(short), pcm.size(), f);
+    fclose(f);
+    pcm.resize(read);
+    if (pcm.empty()) {
+        return;
+    }
+
+    int peak = 0;
+    for (short s : pcm) {
+        const int v = s < 0 ? -s : s;
+        if (v > peak) {
+            peak = v;
+        }
+    }
+    size_t start = 0;
+    while (start < pcm.size() && pcm[start] == 0) {
+        ++start;
+    }
+    auto reach = [&](double frac) {
+        const double want = peak * frac;
+        for (size_t i = start; i < pcm.size(); ++i) {
+            const int v = pcm[i] < 0 ? -pcm[i] : pcm[i];
+            if (v >= want) {
+                return (i - start) * 1000.0 / 16000.0;
+            }
+        }
+        return 0.0;
+    };
+    *to10 = reach(0.10);
+    *to25 = reach(0.25);
+}
+
 long file_size(const std::wstring& path)
 {
     WIN32_FILE_ATTRIBUTE_DATA data = {};
@@ -487,6 +536,62 @@ int wmain(int argc, wchar_t** argv)
     // an utterance that was cut short cannot satisfy: every word is reported,
     // the duration falls as the rate rises, and nothing gets shorter than the
     // rate alone would explain.
+    // Does any voice start with a click?
+    //
+    // A click is an envelope discontinuity, not a steep slope: Castilian Spanish
+    // went from digital silence to a quarter of full scale in half a
+    // millisecond, while American English took sixty. Loud speech has steep
+    // slopes all through it, so the measure has to be how long the sound takes
+    // to come up, not how big a step it contains.
+    if (!positional.empty() && positional[0] == L"onsets") {
+        sandbox_remove();
+        int failures = 0;
+        wchar_t temp[MAX_PATH] = L"";
+        GetTempPathW(MAX_PATH, temp);
+        const std::wstring scratch = std::wstring(temp) + L"Infovox23012_onset.wav";
+
+        std::vector<Voice> all;
+        collect_voices(&all, true);
+        wprintf(L"%-40s %10s %10s\n", L"voice", L"to 10%", L"to 25%");
+        for (Voice& v : all) {
+            if (v.name.find(L"1.12") == std::wstring::npos) {
+                v.token->Release();
+                continue;
+            }
+            ISpVoice* sp = nullptr;
+            if (FAILED(CoCreateInstance(CLSID_SpVoice, nullptr, CLSCTX_ALL, IID_ISpVoice,
+                                        reinterpret_cast<void**>(&sp)))) {
+                v.token->Release();
+                continue;
+            }
+            sp->SetVoice(v.token);
+            ISpStream* stream = open_wav(sp, scratch);
+            if (stream) {
+                sp->SetOutput(stream, TRUE);
+                sp->Speak(L"Hola. This is a test of the onset.", SPF_IS_NOT_XML, nullptr);
+                sp->SetOutput(nullptr, FALSE);
+                stream->Close();
+                stream->Release();
+            }
+            sp->Release();
+            v.token->Release();
+
+            double to10 = 0, to25 = 0;
+            measure_rise(scratch, &to10, &to25);
+            // Under a millisecond from silence to a tenth of the peak is heard
+            // as a click; every voice that never clicked measures far above it.
+            const bool bad = to10 > 0 && to10 < 1.0;
+            if (bad) {
+                ++failures;
+            }
+            wprintf(L"%-40s %7.2fms %7.2fms%s\n", v.name.c_str(), to10, to25,
+                    bad ? L"  <-- starts too abruptly; this is heard as a click" : L"");
+        }
+        wprintf(L"\n%s\n", failures ? L"FAILED" : L"No voice starts abruptly enough to click.");
+        CoUninitialize();
+        return failures ? 6 : 0;
+    }
+
     if (!positional.empty() && positional[0] == L"rates") {
         // Several sentences, not one. Both of the faults this catches depend on
         // where the engine's audio chunks happen to fall, which depends on the

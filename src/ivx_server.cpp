@@ -725,25 +725,56 @@ int wmain(int argc, wchar_t** argv)
     const std::wstring pipe = pipe_name();
     IVX_INFO("server: listening on %S", pipe.c_str());
 
+    // There is always an instance of the pipe waiting for a caller.
+    //
+    // The obvious loop -- create an instance, wait on it, hand it to a thread,
+    // go round -- leaves a window between accepting one caller and creating the
+    // instance for the next in which the pipe name does not exist at all. A
+    // client arriving in that window does not get "busy", which it would wait
+    // out; it gets ERROR_FILE_NOT_FOUND, which is indistinguishable from "the
+    // worker is not running", and it goes off to start one and sleeps.
+    //
+    // That window is only microseconds wide, and it is hit constantly by the one
+    // thing that opens connections in bursts: arrowing through the voice list,
+    // where every voice a screen reader lands on makes a new engine object with
+    // a connection of its own. Measured over thirty voice changes it cost one
+    // utterance outright and delayed another by 184 ms -- speech going quiet
+    // exactly when someone is trying to choose a voice by listening to it.
+    //
+    // So the next instance is created before the accepted one is handed on, and
+    // the name is never without a listener.
+    auto make_instance = [&pipe]() {
+        return CreateNamedPipeW(pipe.c_str(), PIPE_ACCESS_DUPLEX,
+                                PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
+                                PIPE_UNLIMITED_INSTANCES, 1 << 16, 1 << 16, 0, nullptr);
+    };
+
+    HANDLE listening = make_instance();
     while (WaitForSingleObject(g_quit, 0) != WAIT_OBJECT_0) {
-        HANDLE conn = CreateNamedPipeW(pipe.c_str(), PIPE_ACCESS_DUPLEX,
-                                       PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
-                                       PIPE_UNLIMITED_INSTANCES, 1 << 16, 1 << 16, 0, nullptr);
-        if (conn == INVALID_HANDLE_VALUE) {
+        if (listening == INVALID_HANDLE_VALUE) {
             IVX_ERROR("server: CreateNamedPipe failed: %s", win_error(GetLastError()));
             Sleep(1000);
+            listening = make_instance();
             continue;
         }
-        if (!ConnectNamedPipe(conn, nullptr) && GetLastError() != ERROR_PIPE_CONNECTED) {
-            CloseHandle(conn);
+        if (!ConnectNamedPipe(listening, nullptr) && GetLastError() != ERROR_PIPE_CONNECTED) {
+            CloseHandle(listening);
+            listening = make_instance();
             continue;
         }
-        HANDLE t = CreateThread(nullptr, 0, client_thread, conn, 0, nullptr);
+
+        HANDLE serving = listening;
+        listening = make_instance();  // before anything else touches `serving`
+
+        HANDLE t = CreateThread(nullptr, 0, client_thread, serving, 0, nullptr);
         if (t) {
             CloseHandle(t);
         } else {
-            CloseHandle(conn);
+            CloseHandle(serving);
         }
+    }
+    if (listening != INVALID_HANDLE_VALUE) {
+        CloseHandle(listening);
     }
 
     SetEvent(g_quit);

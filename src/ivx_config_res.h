@@ -59,6 +59,8 @@
 // --- engine settings -------------------------------------------------------
 #define IDC_E_TRIM 1201
 #define IDC_E_TRIM_LEAD 1220
+#define IDC_E_ONSET_FADE 1221
+#define IDC_E_ONSET_FADE_SPIN 1222
 #define IDC_E_THRESHOLD 1202
 #define IDC_E_THRESHOLD_SPIN 1203
 #define IDC_E_WORDS 1204

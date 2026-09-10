@@ -12,6 +12,7 @@ const wchar_t kSection[] = L"Settings";
 const wchar_t kTrimTrailingSilence[] = L"TrimTrailingSilence";
 const wchar_t kTrimLeadingSilence[] = L"TrimLeadingSilence";
 const wchar_t kSilenceThreshold[] = L"SilenceThreshold";
+const wchar_t kOnsetFadeMs[] = L"OnsetFadeMs";
 const wchar_t kWordEvents[] = L"WordEvents";
 const wchar_t kSentenceEvents[] = L"SentenceEvents";
 const wchar_t kTimeoutBaseMs[] = L"TimeoutBaseMs";
@@ -91,6 +92,7 @@ void EngineSettings::merge_from(const std::wstring& ini_path)
 
     read_bool(ini_path, settings_key::kTrimTrailingSilence, &trim_trailing_silence);
     read_bool(ini_path, settings_key::kTrimLeadingSilence, &trim_leading_silence);
+    read_int(ini_path, settings_key::kOnsetFadeMs, &onset_fade_ms);
     read_int(ini_path, settings_key::kSilenceThreshold, &silence_threshold);
     read_bool(ini_path, settings_key::kWordEvents, &word_events);
     read_bool(ini_path, settings_key::kSentenceEvents, &sentence_events);
@@ -115,6 +117,13 @@ void EngineSettings::merge_from(const std::wstring& ini_path)
     }
     if (silence_threshold > 32767) {
         silence_threshold = 32767;
+    }
+    if (onset_fade_ms < 0) {
+        onset_fade_ms = 0;
+    }
+    if (onset_fade_ms > 50) {
+        // Long enough to be heard as a slow start rather than a clean one.
+        onset_fade_ms = 50;
     }
     if (timeout_base_ms < 1000) {
         timeout_base_ms = 1000;

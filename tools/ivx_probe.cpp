@@ -356,6 +356,78 @@ int run_worker(const std::wstring& command, const std::vector<std::wstring>& pos
         return first_ms.empty() ? 6 : 0;
     }
 
+    // What arrowing through the voice list does.
+    //
+    // Every time a SAPI host changes voice it makes a new engine object, and
+    // each of those opens its own connection to the worker. So the thing to
+    // measure is not one client speaking repeatedly but a fresh client every
+    // time, connecting from cold -- which is where a connection that arrives
+    // while the worker has no pipe instance listening costs a whole utterance.
+    if (command == L"churn") {
+        const int runs = positional.size() > 1 ? _wtoi(positional[1].c_str()) : 30;
+        LARGE_INTEGER freq = {};
+        QueryPerformanceFrequency(&freq);
+
+        std::vector<double> first_ms;
+        int lost = 0;
+        int slow = 0;
+        for (int i = 0; i < runs; ++i) {
+            // A different voice each time, as arrowing gives.
+            const ivx::Voice& v = catalog.voices()[static_cast<size_t>(i) % catalog.size()];
+            ivx::WorkerClient fresh;
+
+            ivx::SpeakRequest request = {};
+            strncpy_s(request.mode_guid, v.mode_guid.c_str(), _TRUNCATE);
+            request.rate_step = opt.rate;
+            request.pitch_step = opt.pitch;
+            request.volume_pct = opt.volume;
+            request.timeout_ms = 30000;
+
+            LARGE_INTEGER t0 = {};
+            LARGE_INTEGER t_first = {};
+            QueryPerformanceCounter(&t0);
+            bool seen = false;
+            ivx::DoneResponse done = {};
+            const bool ok = fresh.speak(
+                request, v.sapi_name(),
+                [&](const void*, unsigned long) {
+                    if (!seen) {
+                        QueryPerformanceCounter(&t_first);
+                        seen = true;
+                    }
+                    return true;
+                },
+                [](const ivx::EventResponse&) {}, [](const ivx::FormatResponse&) {}, &done);
+            if (!ok || !seen) {
+                ++lost;
+                wprintf(L"  %2d: NO SPEECH (%S)\n", i, v.display_name.c_str());
+                continue;
+            }
+            const double ms = (t_first.QuadPart - t0.QuadPart) * 1000.0 / freq.QuadPart;
+            first_ms.push_back(ms);
+            if (ms > 60.0) {
+                ++slow;
+                wprintf(L"  %2d: %7.1f ms  <-- a delay a listener would notice (%S)\n", i, ms,
+                        v.display_name.c_str());
+            }
+        }
+
+        std::sort(first_ms.begin(), first_ms.end());
+        double sum = 0;
+        for (double x : first_ms) {
+            sum += x;
+        }
+        wprintf(L"\n%d fresh connections, a different voice each time:\n", runs);
+        if (!first_ms.empty()) {
+            wprintf(L"  speak -> first audio     min %6.1f  median %6.1f  mean %6.1f  max %6.1f ms\n",
+                    first_ms.front(), first_ms[first_ms.size() / 2], sum / first_ms.size(),
+                    first_ms.back());
+        }
+        wprintf(L"  utterances lost entirely: %d\n", lost);
+        wprintf(L"  utterances delayed over 60 ms: %d\n", slow);
+        return (lost || slow) ? 6 : 0;
+    }
+
     if (command == L"worker") {
         if (positional.size() < 2) {
             print_usage();
@@ -464,7 +536,8 @@ int wmain(int argc, wchar_t** argv)
         return 0;
     }
 
-    if (command == L"worker" || command == L"workerall" || command == L"latency") {
+    if (command == L"worker" || command == L"workerall" || command == L"latency" ||
+        command == L"churn") {
         printf("\n");
         return run_worker(command, positional, opt, catalog);
     }

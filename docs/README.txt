@@ -367,6 +367,28 @@ from.
 What changed
 ------------
 
+1.0.3  No click at the start of a voice, and speech is not lost when you
+       change voice.
+
+       Some voices -- Castilian Spanish most obviously, and some French and
+       Italian ones -- began each utterance so abruptly that it was heard as a
+       click. The engine goes from silence to a quarter of full scale in half a
+       millisecond. A fade a few milliseconds long over the opening removes it
+       without softening the speech; "Onset fade" on the Engine settings page
+       changes its length, or turns it off to hear exactly what the engine
+       produced.
+
+       Arrowing quickly through the voice list could leave you with no speech
+       until you moved up and down again. Every voice you land on opens a new
+       connection to the background engine, and there was a moment in each
+       cycle when there was nothing there to connect to -- so an utterance was
+       delayed a tenth of a second, or never spoken. Measured over 600 voice
+       changes, nine were lost before and none are now.
+
+       Speech also now starts in about 4 milliseconds every time rather than
+       sometimes 16: Windows 11 was throttling the background engine's timer,
+       and it now asks not to be.
+
 1.0.2  The voice no longer stutters at high speaking rates.
 
        Around 80% rate it repeated a syllable -- "change-ge-ge". Trimming the
@@ -440,6 +462,8 @@ link in the chain:
   Infovox23012SapiTest rates               speaks the same sentence at all
                                            twenty-one speaking rates and checks
                                            none of them is cut short
+  Infovox23012SapiTest onsets              checks no voice starts abruptly
+                                           enough to be heard as a click
 
 
 Where this came from

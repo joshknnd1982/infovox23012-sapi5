@@ -310,6 +310,7 @@ bool VoiceFile::save(std::wstring* error)
     };
     const Numbered numbers[] = {
         {settings_key::kSilenceThreshold, settings_.silence_threshold},
+        {settings_key::kOnsetFadeMs, settings_.onset_fade_ms},
         {settings_key::kTimeoutBaseMs, settings_.timeout_base_ms},
         {settings_key::kTimeoutPerCharMs, settings_.timeout_per_char_ms},
         {settings_key::kRateMin, settings_.rate_min},

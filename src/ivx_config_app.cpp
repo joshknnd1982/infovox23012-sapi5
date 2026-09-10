@@ -1012,6 +1012,10 @@ const wchar_t kEngineHint[] =
     L"the end of every utterance. With it off you hear exactly what the engine produced, "
     L"including that silence after everything your screen reader says.\r\n"
     L"\r\n"
+    L"The onset fade eases each utterance up from nothing over a few milliseconds. Some "
+    L"voices -- Castilian Spanish most obviously, and some French and Italian ones -- start "
+    L"so abruptly that it is heard as a click. Set it to 0 to hear the engine untouched.\r\n"
+    L"\r\n"
     L"Word and sentence positions are what a program uses to highlight the word being "
     L"spoken. Turning them off is worth trying if a program's highlighting is more trouble "
     L"than it is worth.\r\n"
@@ -1038,6 +1042,7 @@ void put_engine_values(HWND dlg, const EngineSettings& settings, int log_level)
     CheckDlgButton(dlg, IDC_E_WORDS, settings.word_events ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(dlg, IDC_E_SENTENCES, settings.sentence_events ? BST_CHECKED : BST_UNCHECKED);
     set_spin(dlg, IDC_E_THRESHOLD_SPIN, 0, 1000, settings.silence_threshold);
+    set_spin(dlg, IDC_E_ONSET_FADE_SPIN, 0, 50, settings.onset_fade_ms);
     set_text(dlg, IDC_E_TIMEOUT, number(settings.timeout_base_ms));
     set_text(dlg, IDC_E_TIMEOUT_PER_CHAR, number(settings.timeout_per_char_ms));
     set_text(dlg, IDC_E_RATE_MIN, number(settings.rate_min));
@@ -1076,6 +1081,7 @@ INT_PTR CALLBACK engine_proc(HWND dlg, UINT message, WPARAM wparam, LPARAM lpara
 
             put_engine_values(dlg, data->settings, data->log_level);
             name_spin(dlg, IDC_E_THRESHOLD_SPIN, L"Level counted as silence");
+            name_spin(dlg, IDC_E_ONSET_FADE_SPIN, L"Onset fade, milliseconds");
             set_text(dlg, IDC_E_HINT, kEngineHint);
             return TRUE;
         }
@@ -1098,6 +1104,8 @@ INT_PTR CALLBACK engine_proc(HWND dlg, UINT message, WPARAM wparam, LPARAM lpara
                     s.sentence_events = IsDlgButtonChecked(dlg, IDC_E_SENTENCES) == BST_CHECKED;
                     s.silence_threshold =
                         clamp(to_int(text_of(dlg, IDC_E_THRESHOLD), 16), 0, 32767);
+                    s.onset_fade_ms =
+                        clamp(to_int(text_of(dlg, IDC_E_ONSET_FADE), 4), 0, 50);
                     s.timeout_base_ms =
                         (std::max)(1000, to_int(text_of(dlg, IDC_E_TIMEOUT), 30000));
                     s.timeout_per_char_ms =

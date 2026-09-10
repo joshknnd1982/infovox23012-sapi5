@@ -589,9 +589,32 @@ bool Engine::load(const std::wstring& engine_dir, const Catalog& catalog)
     // key and hearing the answer. Held for the life of the worker; Windows
     // reference-counts these and the process ending releases it.
     if (!timer_resolution_raised_) {
+        // Windows 11 does not necessarily honour that. A process with no window
+        // that nobody is looking at is exactly what its power throttling is
+        // aimed at, and one of the things it throttles is timer resolution: the
+        // request succeeds and is then quietly ignored, so the engine's sleep
+        // rounds up to a full 15.6 ms tick again.
+        //
+        // That is not theoretical. Measured over four runs of this worker, the
+        // median time from asking for a line to the first sample of it was
+        // either 3.6 ms or 16.4 ms with nothing else changed -- one tick, and
+        // whichever of the two you got was decided by whether the throttling
+        // had taken hold. Opting out makes it 3.6 ms every time.
+        //
+        // ControlMask says which policy to speak about; StateMask 0 says "do
+        // not ignore this process's timer resolution".
+        PROCESS_POWER_THROTTLING_STATE power = {};
+        power.Version = PROCESS_POWER_THROTTLING_CURRENT_VERSION;
+        power.ControlMask = PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION;
+        power.StateMask = 0;
+        const bool honoured = SetProcessInformation(GetCurrentProcess(), ProcessPowerThrottling,
+                                                    &power, sizeof(power)) != FALSE;
+
         timer_resolution_raised_ = timeBeginPeriod(1) == TIMERR_NOERROR;
-        IVX_INFO("engine: multimedia timer resolution %s",
-                 timer_resolution_raised_ ? "raised to 1 ms" : "left as it was");
+        IVX_INFO("engine: multimedia timer resolution %s%s",
+                 timer_resolution_raised_ ? "raised to 1 ms" : "left as it was",
+                 honoured ? ", and this process is exempt from timer throttling"
+                          : " (could not ask to be exempt from timer throttling)");
     }
 
     // The engine resolves its data files against the current directory in some

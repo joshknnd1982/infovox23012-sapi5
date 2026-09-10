@@ -116,7 +116,8 @@ bool WorkerClient::ensure_connected()
     }
 
     const std::wstring name = pipe_name();
-    for (int attempt = 0; attempt < 10; ++attempt) {
+    bool launched = false;
+    for (int attempt = 0; attempt < 40; ++attempt) {
         pipe_ = CreateFileW(name.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING,
                             0, nullptr);
         if (pipe_ != INVALID_HANDLE_VALUE) {
@@ -128,11 +129,25 @@ bool WorkerClient::ensure_connected()
 
         const DWORD err = GetLastError();
         if (err == ERROR_FILE_NOT_FOUND) {
-            if (attempt == 0 && !launch_worker()) {
-                return false;
+            // "Not found" is not the same as "not running". A worker between
+            // pipe instances looks exactly like a worker that was never
+            // started, and treating the two alike meant a moment's bad timing
+            // cost a tenth of a second and started a second worker that had
+            // nothing to do. So: a few quick retries first, and only then
+            // conclude that nobody is home.
+            if (!launched && attempt < 3) {
+                Sleep(1);
+                continue;
             }
-            Sleep(100);
+            if (!launched) {
+                if (!launch_worker()) {
+                    return false;
+                }
+                launched = true;
+            }
+            Sleep(25);  // it takes about 200 ms to come up; look often
         } else if (err == ERROR_PIPE_BUSY) {
+            // Every instance is serving someone. This one does wait properly.
             WaitNamedPipeW(name.c_str(), 2000);
         } else {
             IVX_ERROR("client: cannot open %S: %s", name.c_str(), win_error(err));
@@ -336,27 +351,69 @@ bool WorkerClient::speak(SpeakRequest request, const std::wstring& text,
                          const FormatHandler& on_format, DoneResponse* done)
 {
     Lock lock(&cs_);
-    if (!ensure_connected()) {
-        return false;
-    }
-    if (cancel_) {
-        ResetEvent(cancel_);
-    }
-    wcsncpy_s(request.cancel_event, cancel_name_.c_str(), _TRUNCATE);
-    request.text_chars = static_cast<uint32_t>(text.size());
 
-    std::vector<char> payload(sizeof(request) + text.size() * sizeof(wchar_t));
-    memcpy(payload.data(), &request, sizeof(request));
-    if (!text.empty()) {
-        memcpy(payload.data() + sizeof(request), text.data(), text.size() * sizeof(wchar_t));
-    }
+    // Twice, because a worker that goes away is something to recover from
+    // rather than something to report. It happens when the configuration
+    // utility restarts the engine to preview a voice, when an installer
+    // replaces it, and if it ever faults -- and in every one of those a screen
+    // reader would otherwise lose the line it was reading. Reconnecting starts
+    // a fresh worker if there is none, so the second attempt has a real chance.
+    //
+    // Only a dead connection is retried. An abort, an engine error, or audio
+    // the caller refused are all answers, and asking again would either repeat
+    // speech the user has already heard or hang on the same fault twice.
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        if (!ensure_connected()) {
+            return false;
+        }
+        if (cancel_) {
+            ResetEvent(cancel_);
+        }
+        wcsncpy_s(request.cancel_event, cancel_name_.c_str(), _TRUNCATE);
+        request.text_chars = static_cast<uint32_t>(text.size());
 
-    if (!send(REQ_SPEAK, payload.data(), static_cast<uint32_t>(payload.size()))) {
-        IVX_ERROR("client: could not send the utterance: %s", win_error(GetLastError()));
-        disconnect();
-        return false;
+        std::vector<char> payload(sizeof(request) + text.size() * sizeof(wchar_t));
+        memcpy(payload.data(), &request, sizeof(request));
+        if (!text.empty()) {
+            memcpy(payload.data() + sizeof(request), text.data(), text.size() * sizeof(wchar_t));
+        }
+
+        if (!send(REQ_SPEAK, payload.data(), static_cast<uint32_t>(payload.size()))) {
+            const DWORD err = GetLastError();
+            disconnect();
+            if (attempt == 0) {
+                IVX_WARN("client: the worker went away before the utterance was sent (%s); "
+                         "reconnecting and asking again",
+                         win_error(err));
+                continue;
+            }
+            IVX_ERROR("client: could not send the utterance: %s", win_error(err));
+            return false;
+        }
+
+        // Whether the listener has heard any of this utterance yet. Asking
+        // again once nothing has been heard is a delay; asking again once
+        // something has is the beginning of the sentence spoken twice, which is
+        // worse than the line being dropped.
+        bool heard = false;
+        const AudioHandler watch = [&](const void* data, unsigned long bytes) {
+            heard = true;
+            return on_audio ? on_audio(data, bytes) : true;
+        };
+
+        DoneResponse local = {};
+        if (stream_utterance(watch, on_event, on_format, done ? done : &local)) {
+            return true;
+        }
+        // stream_utterance has already disconnected if the pipe died. If it is
+        // still open the failure was an answer, not a broken connection.
+        if (connected() || heard || attempt == 1) {
+            return false;
+        }
+        IVX_WARN("client: the worker went away before any of the utterance was heard; "
+                 "reconnecting and asking again");
     }
-    return stream_utterance(on_audio, on_event, on_format, done);
+    return false;
 }
 
 bool WorkerClient::speak_phonemes(PhonemeRequest request, const std::wstring& phonemes,

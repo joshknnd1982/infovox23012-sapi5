@@ -163,6 +163,50 @@ highlighting still lands on the right word.
 
 ## Releases
 
+**1.0.3** — no click at the start of a voice, and no lost speech when changing
+voice.
+
+*The click.* Some voices start abruptly: Castilian Spanish goes from digital
+silence to a quarter of full scale in half a millisecond, where American English
+takes sixty. The step is the engine's own — the samples immediately before it are
+exact zeros — and it is heard as a click before every utterance. A raised-cosine
+fade over the first few milliseconds takes it off without softening the speech;
+rise time to a tenth of peak goes from 0.25–0.50 ms to 2.4–9.8 ms, which is where
+the voices that never clicked already sat. `OnsetFadeMs` in `[Settings]` changes
+the length or turns it off. It turned out not to be only Spanish:
+`Infovox23012SapiTest onsets` measures all sixty and flagged French and Italian
+voices too.
+
+*The lost speech.* Every time a SAPI host changes voice it makes a new engine
+object, and each one opens its own connection to the worker — so arrowing through
+the voice list is a burst of connections. The worker's accept loop created the
+next pipe instance only after handing the accepted one to a thread, and in that
+window the pipe name does not exist. A client arriving then does not get "busy",
+which it would wait out; it gets `ERROR_FILE_NOT_FOUND`, which is
+indistinguishable from "no worker is running", so it went off to start one and
+slept a tenth of a second — or gave up, and the line was never spoken. The next
+instance is now created before the accepted one is handed on, so the name is
+never without a listener; the client retries quickly before concluding nobody is
+home; and if the worker does go away before any of an utterance has been heard,
+the client reconnects and asks again rather than dropping it.
+
+Measured over 600 voice changes, each run against a freshly started worker:
+
+| | utterances lost | delayed over 60 ms |
+| --- | --- | --- |
+| before | 9 | 6 |
+| after | **0** | 9 |
+
+Nothing is lost now; at worst a line waits while a worker starts.
+
+*And a third thing found on the way.* Latency was bimodal — the median time from
+asking for a line to the first sample of it was either 3.6 ms or 16.4 ms, with
+nothing changed between runs. 16.4 ms is one Windows timer tick: Windows 11 power
+throttling was quietly ignoring the worker's request for 1 ms timer resolution,
+because a windowless background process is exactly what that throttling is aimed
+at. The worker now opts out with `PROCESS_POWER_THROTTLING_IGNORE_TIMER_RESOLUTION`,
+and eight consecutive runs measure 3.6–4.0 ms.
+
 **1.0.2** — no more stutter at high speaking rates.
 
 Reported as: "around 80% rate it begins to stutter — it says change-ge-ge".

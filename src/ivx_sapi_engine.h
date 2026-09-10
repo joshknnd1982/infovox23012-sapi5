@@ -80,6 +80,10 @@ private:
 
     // Bytes per sample frame of the output format, never zero.
     unsigned block_align() const;
+
+    // Eases the opening of a piece up from nothing, to take the click off
+    // the voices that start abruptly. Repoints `data` at a scratch copy.
+    void apply_onset_fade(const void*& data, unsigned long bytes);
     void emit_word(const Run& run, uint32_t tagged_index, unsigned long stream_offset,
                    ISpTTSEngineSite* site);
     void emit_bookmark(uint32_t number, unsigned long stream_offset, ISpTTSEngineSite* site);
@@ -109,6 +113,13 @@ private:
     // position reported for that piece has to be shifted back by.
     bool leading_ = true;
     unsigned long lead_dropped_ = 0;
+
+    // The fade over the opening of each piece: how many samples of it are left,
+    // how long it is in total, and somewhere to do it that is not the buffer
+    // the worker reuses.
+    unsigned long fade_remaining_ = 0;
+    unsigned long fade_total_ = 0;
+    std::vector<short> fade_scratch_;
 
     // Running totals for one Speak call, so that "everything the engine
     // produced was written once, dropped once, or is still held" can be

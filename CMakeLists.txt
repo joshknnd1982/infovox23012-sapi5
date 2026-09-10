@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Infovox23012SAPI VERSION 1.0.2 LANGUAGES CXX RC)
+project(Infovox23012SAPI VERSION 1.0.3 LANGUAGES CXX RC)
 
 # The Infovox 230 engine is a 32-bit dll, so the worker that owns it is always
 # x86. The SAPI5 engine itself is built twice -- 32-bit for 32-bit hosts and

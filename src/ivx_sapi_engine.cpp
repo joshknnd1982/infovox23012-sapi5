@@ -350,6 +350,8 @@ bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSi
     //
     // So the odd tail is kept and put on the front of the next chunk. What
     // reaches Write is always whole samples.
+    received_ += bytes;
+
     std::vector<BYTE> joined;
     const BYTE* p = static_cast<const BYTE*>(data);
     if (!partial_.empty()) {
@@ -403,6 +405,7 @@ bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSi
         const unsigned long dropped =
             static_cast<unsigned long>(first_loud * sizeof(short));
         lead_dropped_ += dropped;
+        lead_total_ += dropped;
         if (first_loud == lead_count) {
             return true;  // the whole chunk was lead-in
         }
@@ -410,6 +413,14 @@ bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSi
         data = static_cast<const BYTE*>(data) + dropped;
         bytes -= dropped;
     }
+
+    // `data` has just moved; everything below indexes from here, and reading
+    // from where the chunk started instead would hand back bytes that have
+    // already been written. That is audible: the run held for the next flush
+    // began `dropped` bytes too early, so a tenth of a second of speech was
+    // written twice and the voice stuttered -- "change-ge-ge" -- on whichever
+    // utterance happened to have a gap in its first chunk of audio.
+    const BYTE* const begin = static_cast<const BYTE*>(data);
 
     const short* samples = static_cast<const short*>(data);
     const size_t count = bytes / sizeof(short);
@@ -427,7 +438,7 @@ bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSi
 
     if (last_loud == count) {
         // Entirely quiet: hold it back in case this is the end of the utterance.
-        quiet_.insert(quiet_.end(), p, p + bytes);
+        quiet_.insert(quiet_.end(), begin, begin + bytes);
         return true;
     }
 
@@ -441,7 +452,7 @@ bool TtsEngine::feed_audio(const void* data, unsigned long bytes, ISpTTSEngineSi
         return false;
     }
     if (loud_bytes < bytes) {
-        quiet_.assign(p + loud_bytes, p + bytes);
+        quiet_.assign(begin + loud_bytes, begin + bytes);
     }
     return true;
 }
@@ -481,6 +492,7 @@ HRESULT TtsEngine::write_silence(ULONG milliseconds, ISpTTSEngineSite* site)
         // See write_bytes: pcbWritten is not to be believed.
         const ULONG took = (written == 0 || written > chunk) ? chunk : written;
         stream_offset_ += took;
+        generated_ += took;
         remaining -= took;
     }
     IVX_DEBUG("sapi: wrote %lu ms of silence", static_cast<unsigned long>(milliseconds));
@@ -585,6 +597,9 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
     bookmarks_.clear();
     quiet_.clear();
     partial_.clear();
+    received_ = 0;
+    lead_total_ = 0;
+    generated_ = 0;
     stream_offset_ = 0;
     aborted_ = false;
 
@@ -771,6 +786,26 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
     IVX_DEBUG("sapi: Speak finished, %lu bytes written, %u bytes of trailing padding "
               "trimmed%s",
               stream_offset_, static_cast<unsigned>(trimmed), aborted_ ? " (aborted)" : "");
+
+    // Everything the engine produced was either written to the host, dropped as
+    // padding at one end or the other, or is still held. Nothing else is
+    // legitimate -- in particular nothing may be written twice, which is what a
+    // stutter sounds like and what no duration or word count would reveal. The
+    // arithmetic is exact, so it is checked rather than assumed. Silence this
+    // layer generates itself is not part of it, hence generated_.
+    if (!aborted_) {
+        const unsigned long long accounted = static_cast<unsigned long long>(stream_offset_) -
+                                             generated_ + lead_total_ + trimmed + partial_.size();
+        if (accounted != received_) {
+            IVX_WARN("sapi: %llu bytes came from the engine but %llu are accounted for "
+                     "(written %lu, generated %llu, lead %llu, trailing %u, held %u) -- "
+                     "%lld byte(s) were written %s",
+                     received_, accounted, stream_offset_, generated_, lead_total_,
+                     static_cast<unsigned>(trimmed), static_cast<unsigned>(partial_.size()),
+                     static_cast<long long>(accounted) - static_cast<long long>(received_),
+                     accounted > received_ ? "twice" : "not at all");
+        }
+    }
     return S_OK;
 }
 

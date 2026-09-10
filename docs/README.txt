@@ -367,6 +367,17 @@ from.
 What changed
 ------------
 
+1.0.2  The voice no longer stutters at high speaking rates.
+
+       Around 80% rate it repeated a syllable -- "change-ge-ge". Trimming the
+       inaudible padding from the start of each piece of speech left one thing
+       reading from the wrong place, so the last tenth of a second of what had
+       just been said went out again. Whether it happened depended on the words
+       and the rate, which is why it looked like a speed problem.
+
+       Check it on your own machine, with no administrator needed:
+         Infovox23012SapiTest rates
+
 1.0.1  Speech is no longer cut off at higher speaking rates.
 
        Above about a quarter of the rate range, words were cut off at the end

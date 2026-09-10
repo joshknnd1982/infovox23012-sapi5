@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -212,6 +213,95 @@ bool make_directory(const std::wstring& path)
            GetLastError() == ERROR_ALREADY_EXISTS;
 }
 
+// Looks for a stretch of samples written to the output twice.
+//
+// Two bugs in the audio path have been invisible to every other check: one cut
+// utterances short, which a duration test catches, and one wrote a tenth of a
+// second of speech twice, which a duration test does not -- it makes the file
+// slightly longer, not shorter, and it sounds like a stutter ("change-ge-ge").
+//
+// It is harder than it looks, because a formant synthesiser produces bit-exact
+// periodic waveforms during a sustained vowel: "identical to a moment ago"
+// happens constantly at slow rates and means nothing. Two things separate a
+// copy from a steady tone:
+//
+//   * Where. The duplication can only happen on the one chunk where the lead-in
+//     is trimmed, which by construction is at the start of a run -- so only the
+//     opening quarter-second is searched. Every false positive measured was
+//     later than 1.5 seconds in.
+//   * What came before. In a sustained vowel the period before the matched one
+//     looks much the same. In a copy the block was pasted after unrelated
+//     audio, so one lag further back looks nothing like it.
+//
+// Returns the offset in samples of the repeat, or -1.
+long find_repeated_audio(const std::wstring& path)
+{
+    FILE* f = nullptr;
+    if (_wfopen_s(&f, path.c_str(), L"rb") != 0 || !f) {
+        return -1;
+    }
+    fseek(f, 0, SEEK_END);
+    const long size = ftell(f);
+    if (size <= 44) {
+        fclose(f);
+        return -1;
+    }
+    std::vector<short> pcm(static_cast<size_t>(size - 44) / sizeof(short));
+    fseek(f, 44, SEEK_SET);
+    const size_t read = fread(pcm.data(), sizeof(short), pcm.size(), f);
+    fclose(f);
+    pcm.resize(read);
+
+    const size_t rate = 16000;
+    const size_t window = rate * 15 / 1000;    // 15 ms
+    const size_t max_lag = rate * 400 / 1000;  // as far back as a copy could come
+    const size_t search = (std::min)(pcm.size(), rate * 250 / 1000);
+    if (search < window * 2) {
+        return -1;
+    }
+
+    auto mean_abs = [&pcm](size_t at, size_t n) {
+        double total = 0;
+        for (size_t k = 0; k < n; ++k) {
+            total += pcm[at + k] < 0 ? -pcm[at + k] : pcm[at + k];
+        }
+        return total / n;
+    };
+
+    for (size_t i = window; i + window <= search; i += window / 2) {
+        short peak = 0;
+        for (size_t k = 0; k < window; ++k) {
+            const short v = pcm[i + k] < 0 ? static_cast<short>(-pcm[i + k]) : pcm[i + k];
+            if (v > peak) {
+                peak = v;
+            }
+        }
+        if (peak < 64) {
+            continue;  // silence matches everything
+        }
+        const double level = mean_abs(i, window);
+        const size_t lo = i > max_lag ? i - max_lag : 0;
+        for (size_t j = lo; j + window <= i; ++j) {
+            if (memcmp(&pcm[j], &pcm[i], window * sizeof(short)) != 0) {
+                continue;
+            }
+            const size_t lag = i - j;
+            if (j >= lag) {
+                double diff = 0;
+                for (size_t k = 0; k < window; ++k) {
+                    const int d = pcm[j - lag + k] - pcm[j + k];
+                    diff += d < 0 ? -d : d;
+                }
+                if (level > 0 && diff / window < 0.35 * level) {
+                    break;  // the waveform was already doing this: periodic
+                }
+            }
+            return static_cast<long>(i);
+        }
+    }
+    return -1;
+}
+
 long file_size(const std::wstring& path)
 {
     WIN32_FILE_ATTRIBUTE_DATA data = {};
@@ -398,10 +488,27 @@ int wmain(int argc, wchar_t** argv)
     // the duration falls as the rate rises, and nothing gets shorter than the
     // rate alone would explain.
     if (!positional.empty() && positional[0] == L"rates") {
-        const std::wstring text =
-            positional.size() > 1
-                ? positional[1]
-                : L"One two three four five six seven eight nine ten eleven twelve.";
+        // Several sentences, not one. Both of the faults this catches depend on
+        // where the engine's audio chunks happen to fall, which depends on the
+        // words as much as on the rate: the duplicated-audio fault was plainly
+        // audible on "The change of rate..." at half the rate steps and did not
+        // appear at all on "One two three...". One sentence would have passed
+        // while the voice stuttered.
+        static const wchar_t* const kTexts[] = {
+            L"One two three four five six seven eight nine ten eleven twelve.",
+            L"The change of rate should not repeat any syllable at all.",
+            L"She sells sea shells on the sea shore, and the shells she sells are sea shells.",
+            // The one that first showed the stutter, reported as "change-ge-ge".
+            L"change. change the settings. exchange. arrange. change of rate.",
+        };
+        std::vector<std::wstring> texts;
+        if (positional.size() > 1) {
+            texts.push_back(positional[1]);
+        } else {
+            for (const wchar_t* s : kTexts) {
+                texts.push_back(s);
+            }
+        }
         sandbox_remove();
         if (!sandbox_install(L"Infovox 1.12 sandbox", want_mode, L"409")) {
             CoUninitialize();
@@ -428,6 +535,9 @@ int wmain(int argc, wchar_t** argv)
         // column reads zero. It is printed anyway: a non-zero value would mean
         // this ran differently from how it is described here.
         wprintf(L"rate   bytes   seconds  words (a file stream carries none)\n");
+        for (const std::wstring& text : texts) {
+        previous = 0.0;
+        wprintf(L"\n  \"%s\"\n", text.c_str());
         for (int r = -10; r <= 10; ++r) {
             ISpObjectToken* token = sandbox_token();
             ISpVoice* v = nullptr;
@@ -468,8 +578,12 @@ int wmain(int argc, wchar_t** argv)
             // one rate step is only about a tenth, so nothing legitimate drops
             // by half between neighbours or gets longer as the rate rises.
             const double seconds = bytes > 44 ? (bytes - 44) / 32000.0 : 0.0;
+            const long repeat = find_repeated_audio(scratch);
             const wchar_t* verdict = L"";
-            if (seconds < 0.5) {
+            if (repeat >= 0) {
+                verdict = L"  <-- REPEATED AUDIO (a stutter)";
+                ++failures;
+            } else if (seconds < 0.5) {
                 verdict = L"  <-- TRUNCATED";
                 ++failures;
             } else if (previous > 0.0 && seconds > previous + 0.02) {
@@ -481,6 +595,7 @@ int wmain(int argc, wchar_t** argv)
             }
             previous = seconds;
             wprintf(L"%4d %8ld %8.2f %6d%s\n", r, bytes, seconds, tally.words, verdict);
+        }
         }
         sandbox_remove();
         wprintf(L"\n%s\n", failures ? L"FAILED" : L"Every rate speaks the whole utterance.");

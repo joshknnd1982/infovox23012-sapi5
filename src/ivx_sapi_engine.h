@@ -110,6 +110,13 @@ private:
     bool leading_ = true;
     unsigned long lead_dropped_ = 0;
 
+    // Running totals for one Speak call, so that "everything the engine
+    // produced was written once, dropped once, or is still held" can be
+    // checked rather than assumed. See the end of Speak().
+    unsigned long long received_ = 0;    // bytes arriving from the worker
+    unsigned long long lead_total_ = 0;  // lead-in dropped, across all pieces
+    unsigned long long generated_ = 0;   // silence this layer made itself
+
     // Up to one sample short of a whole one, held back from the end of a chunk
     // because the engine's chunk boundaries are not sample boundaries and the
     // host will not accept a part sample. See feed_audio().

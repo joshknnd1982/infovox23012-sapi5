@@ -163,6 +163,36 @@ highlighting still lands on the right word.
 
 ## Releases
 
+**1.0.2** — no more stutter at high speaking rates.
+
+Reported as: "around 80% rate it begins to stutter — it says change-ge-ge".
+
+Trimming the inaudible lead-in off each piece of speech moves the pointer to the
+audio forward, and one thing downstream of it was still reading from where the
+chunk had started. The run of quiet held back for the next flush therefore began
+a lead-in too early, so the last tenth of a second of what had *just* been
+written went out a second time. It only bit when the chunk carrying the lead-in
+also ended in a gap, which depends on the words and on the rate — hence a bug
+that seemed to appear above a particular speed.
+
+Measured on the reported phrase, identical input, before and after:
+
+| SAPI rate | repeated blocks before | after |
+| --- | --- | --- |
+| 4 | 10, each 90 ms | none |
+| 6 | 7, each 67 ms | none |
+| 8 | 5, each 54 ms | none |
+
+Neither a duration check nor the byte accounting could see this: the same
+*number* of bytes is written either way, just the wrong ones — a shifted read,
+not a longer one. `Infovox23012SapiTest rates` now reads each utterance back and
+looks for a stretch of audio that repeats one shortly before it, across four
+sentences at all twenty-one rate steps. That is a harder test than it sounds,
+because a formant synthesiser makes bit-exact periodic waveforms during a
+sustained vowel; what separates a copy from a steady tone is that in a steady
+tone the period *before* the match looks much the same, and in a copy it looks
+nothing like it.
+
 **1.0.1** — speech no longer stops mid-word above a quarter of the rate range.
 
 The engine hands its audio over in whatever pieces its internal buffering

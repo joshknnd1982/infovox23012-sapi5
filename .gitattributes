@@ -1,0 +1,26 @@
+# Source and documentation keep LF in the repository and are checked out with
+# whatever the platform wants.
+*.c     text
+*.cpp   text
+*.h     text
+*.hpp   text
+*.inc   text
+*.py    text
+*.md    text
+*.txt   text
+*.ini   text
+*.iss   text
+*.rc    text
+*.def   text
+*.bat   text eol=crlf
+CMakeLists.txt text
+
+# Everything under bin/ is the 1998 product: engine binaries, language rule
+# files, the compiled installer script and 27-year-old text files. None of it is
+# ours to reformat, and a line-ending conversion applied to a rule file would
+# leave a voice that loads and mispronounces. Last, so it wins over the rules
+# above -- in .gitattributes the later match takes effect.
+*.dll   binary
+*.exe   binary
+*.ivx   binary
+bin/**  binary

@@ -1,0 +1,108 @@
+What's new for Infovox 230 and 330 v1.12 
+========================================
+
+Latest update: November 1998
+
+
+New/updated Languages
+---------------------
+
+Annmarie, new Swedish female voice (Infovox 330)
+
+- A new high-quality voice has been added to the Infovox 330. Her name 
+  is AnnMarie and her language is Swedish. Check it out!
+
+
+New release of the Swedish language rules (both Infovox 230 and 330)
+
+- A new release of the language rules file for the Swedish language has 
+  been included in v1.12 of Infovox 230/330. This is not just a maintenance 
+  update, but a new release, including, among other features an extended 
+  lexicon for correct pronunciation of a large number of words. This upgrade 
+  will result in many benefits for both Infovox 230 and Infovox 330 users.
+  Check the documentation (included in the release CD and available at our
+  web site: www.infovox.se) for detailed information on the Swedish rules.
+
+
+New release of the British English language rules (both Infovox 230 and 330)
+
+- A new release of the language rules file for the Swedish language has 
+  been included in v1.12 of Infovox 230/330. It includes a large lexicon that 
+  gives you an even more precise pronunciation for a large number of english 
+  words. This upgrade affects both the Infovox 230 and the Infovox 330.
+  Check the documentation (included in the release CD and available at our
+  web site: www.infovox.se) for detailed information on the British English 
+  rules.
+  Please note that the filename for the british rules has been changed from
+  BRRULES.IVX to BLRULES.IVX.
+
+
+Update for the German language rules (both Infovox 230 and 330)
+
+- This update, already distributed with the patch for Infovox 230 and 330 
+  v1.11, upgrade and improve the language rules for the German language,
+  for both Infovox 230 and Infovox 330 products.
+  Check the documentation (included in the release CD and available at our
+  web site: www.infovox.se) for detailed information on the German rules.
+
+
+New version of the Icelandic language rules (Infovox 230)
+
+- A new release of the language rules for Icelandic has been included in
+  v1.12 of Infovox 230/330. This is a major improvement in the Infovox 
+  implementation of the Icelandic language, with many new features.
+  Check the documentation (included in the release CD and available at our
+  web site: www.infovox.se) for detailed information on the Icelandic rules.
+
+
+
+Fixed bug/New features
+----------------------
+
+Speech API: Start/Stop notifications
+
+- The AudioStart and AudioStop messages are now always sent in the right 
+  order. This solves several problems with various applications, like for 
+  instance the temporary speech stoppage using ZoomTextXtra.
+
+
+Speech API: Volume
+
+- The volume settings has been modified so that you have output from
+  both channels even with applications like Jaws for Windows that assumes
+  Infovox to be a monophonic synthesiser.
+
+Speech API: Speed
+
+- The maximum speed has been set to 500 wpm (words per minutes), since the 
+  original maximum value (1400 wpm) was practically unusable and would 
+  confuse some application that would get the wrong scale for the speed 
+  parameter.
+
+Internal: Optimization of speech parameter
+
+- The handling of speech parameter has been optimized and checked. From an
+  external point of view this result in more consistency in setting/retrieving
+  speech parameter. For instance, when setting a parameter value like speech
+  rate in the Engine Property Box, the new value can be immediately retrieved 
+  with the SAPI function GetSpeed.
+
+Installation program: complete NT support
+
+- The installation program for v1.1 had some trouble under Windows NT, 
+  requiring often to manually update files and restart the computer. Now 
+  everything is properly handled by the installation program.
+
+License Manager
+
+- Fixed bug in enabling the Software Key license for german.
+
+Default settings for all Infovox modes
+
+- A fine tuning operation has been performed to find the most adequate 
+  default setting of pitch and dynamics for each mode of Infovox 230 
+  and Infovox 330.
+
+Memory leaks
+
+- All memory leaks where detected and eliminated.

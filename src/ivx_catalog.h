@@ -1,0 +1,149 @@
+#pragma once
+
+// The voice catalogue: the engine's mode table, plus whatever the user has
+// added.
+//
+// Every field here is a value the Infovox 230 engine reads out of its
+// configuration, spelled exactly as the engine spells it. The catalogue is
+// written into the virtual registry before the engine loads, so this table --
+// not anything installed on the machine -- is what the engine enumerates.
+//
+// The 60 built-in entries are the stock modes: twelve languages
+// (American and British English, Danish, Dutch, Finnish, French, German,
+// Icelandic, Italian, Norwegian, Castilian Spanish, Swedish) times five
+// speakers (Male, Female, Child, Giant, Zombie). The speakers differ only in
+// the four synthesis parameters Pitch, Dynamic, Aspiration and FormantNo, which
+// is why users can define their own: see load_user_voices().
+//
+// Not all sixty are necessarily present. The installer offers the languages and
+// the voices inside them one at a time and records what was chosen in
+// installed.ini beside the dll; apply_installed_selection() then leaves the
+// catalogue holding only those. The table is what the product CAN offer; the
+// catalogue is what this installation actually has.
+
+#include <string>
+#include <vector>
+
+#include "ivx_settings.h"
+
+namespace ivx {
+
+// A row of the generated table in ivx_voices.inc. Kept as plain char pointers
+// so the table is const data with no start-up cost.
+struct BuiltinVoice {
+    const char* mode_key;
+    const char* display_name;
+    const char* language_name;
+    const char* mode_guid;
+    const char* language_id;
+    unsigned short lcid;
+    const char* language_file;
+    const char* library_file;
+    const char* phsym_file;
+    const char* speaker_name;
+    const char* speaker_style;
+    const char* gender;
+    const char* age;
+    const char* pitch;
+    const char* dynamic;
+    const char* aspiration;
+    const char* formant_no;
+};
+
+struct Voice {
+    std::string mode_key;      // the engine's key name under Modes
+    std::string display_name;  // what the Windows voice list shows
+    std::string language_name; // the prefix the engine requires of mode_key
+    std::string mode_guid;     // "{...}", the id Select() takes
+    std::string language_id;   // as the engine wants it, decimal
+    unsigned short lcid = 0;   // full LCID for the SAPI5 token
+    std::string language_file;
+    std::string library_file;
+    std::string phsym_file;
+    std::string speaker_name;
+    std::string speaker_style;
+    std::string gender;  // "1" female, "2" male, as the engine numbers them
+    std::string age;
+    std::string pitch;       // per-voice synthesis parameters; empty means
+    std::string dynamic;     // "leave the engine's default for this language"
+    std::string aspiration;
+    std::string formant_no;
+    bool user_defined = false;
+
+    // A built-in that a voices.ini section names. Naming one is asking for it,
+    // which is how a voice the installer left out is put back without running
+    // the installer again. Never set on a voice that came only from the table.
+    bool named_by_user = false;
+
+    // SAPI5 token attributes derived from the above.
+    std::wstring sapi_name() const;
+    std::wstring sapi_gender() const;
+    std::wstring sapi_age() const;
+    std::wstring sapi_language() const;  // LCID in hex, no leading zeros
+};
+
+class Catalog {
+public:
+    // Built-ins, then any user voices found in `voices.ini` next to the module
+    // and in %LOCALAPPDATA%\Infovox23012SAPI\voices.ini. A user entry whose
+    // section name matches a built-in display name overrides that voice rather
+    // than adding another. What the installer chose is applied last, so that
+    // what is left is what this installation can actually speak with.
+    void load(const std::wstring& module_dir);
+
+    const std::vector<Voice>& voices() const { return voices_; }
+
+    // The [Settings] section of those same files: everything that is not a
+    // property of one voice.
+    const EngineSettings& settings() const { return settings_; }
+
+    // True when one of the files load() read has been written since it read
+    // them. The worker owns the engine for a whole logon session, so without
+    // this a voice defined after it started is in the Windows voice list --
+    // registering is a separate process, which does see it -- and yet cannot be
+    // spoken, because the engine was given its table once and never again.
+    bool config_changed() const;
+
+    size_t size() const { return voices_.size(); }
+
+    // Index of the voice whose display name matches, or -1.
+    int find_by_name(const std::wstring& display_name) const;
+    int find_by_mode_guid(const std::string& guid, int except = -1) const;
+
+    // The name the engine is given. `except` skips one entry, so a voice being
+    // built can test its own candidate name for collisions.
+    int find_by_mode_key(const std::string& mode_key, int except = -1) const;
+
+    // First voice whose LanguageFile matches, which is how a voice's language --
+    // and so the prefix the name the engine is given must carry -- is worked
+    // out. `except` skips one entry, which matters when the voice asking is a
+    // built-in whose LanguageFile has been changed: without it, it finds itself
+    // and concludes that its old name was right all along.
+    int find_by_language_file(const std::string& language_file, int except = -1) const;
+
+    // Write the whole catalogue, plus the engine's own directory settings, into
+    // the virtual registry. `engine_dir` is where Ivx230nt.dll and the .ivx rule
+    // files live; the engine resolves every data file relative to it.
+    void seed_virtual_registry(const std::string& engine_dir) const;
+
+private:
+    void load_user_voices(const std::wstring& ini_path);
+
+    // Existence, size and last-write time of the files load() reads, mixed
+    // together. Compared rather than interpreted, so the clock going backwards
+    // still counts as a change.
+    static unsigned long long config_stamp(const std::wstring& module_dir);
+
+    // Reduces the built-ins to the ones the installer put there: the voices
+    // named in installed.ini, and only those whose language rule files are on
+    // disk. Runs last, so a user voice can still take any built-in as its
+    // template and a voices.ini section can still ask for one back.
+    void apply_installed_selection(const std::wstring& install_dir);
+
+    std::vector<Voice> voices_;
+    EngineSettings settings_;
+    std::wstring module_dir_;
+    unsigned long long stamp_ = 0;
+};
+
+}  // namespace ivx

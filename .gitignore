@@ -1,0 +1,14 @@
+build
+build_x64
+build_x86
+output
+
+# Generated: voice samples, and anything the engine's own logging leaves behind
+samples
+bin/engine/IVX230_*.LOG
+__pycache__/
+*.pyc
+
+# The rest of the 1998 distribution: Microsoft and CrypKey redistributables that
+# nothing here uses and that are not ours to publish. Kept on disk, not shipped.
+bin/orig/dist/

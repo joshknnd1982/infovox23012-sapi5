@@ -1,0 +1,249 @@
+==================================================
+  Getting Started with the Infovox 230/330 v1.12
+==================================================
+
+
+Contents 
+
+- Documentation 
+- How to contact us 
+- System requirements 
+- Upgrading from Infovox 230 v1.0
+- Upgrading from Infovox 230/330 v1.1 or v1.11
+- Installing the Infovox 230/330
+- Uninstalling the Infovox 230/330
+- Infovox language licenses 
+- Buying a language license 
+- Using a language license received with a previous version of Infovox
+- The License Manager 
+
+
+
+Documentation
+=============
+
+The complete User's Guides for the Infovox 230 and for the Infovox 330 are included on the distribution CD. They can also be downloaded from our WEB site (http://www.infovox.se).
+In addition to what you can read in this Getting Started guide, in the User's Guide you'll find an exhaustive description of the following subjects:
+- The Infovox 230 (or 330) Text-to-Speech Engine Property Box.
+- The Infovox 230 (or 330) Text-to-Speech Lexicon Browser.
+- The Infovox Language Licenses.
+- The License Manager.
+- How to manage licenses.
+- How to move licenses between computers.
+- How to share licenses on a local network.
+- The Infovox Speech Application.
+- The Infovox Speech Clipboard.
+Finally, for developers who intends to integrate the Infovox 230/330 in their applications, there is a whole chapter illustrating in details the implementation of Microsoft Speech API 3.0 in the Infovox 230/330 Text-to-Speech Engine.
+
+
+
+How to contact us
+=================
+
+The best way to get information on new products, answer to your technical questions, or the latest updates or tools for the Infovox 230/330 is to check our web site. Please visit us at the following address:
+
+http://www.infovox.se
+
+You can also reach us using any of the following methods:
+By e-mail: tts-sales@promotor.telia.se 
+By fax:    +46 8 764 35 99, Att: Sales and Marketing Text-to-Speech 
+By phone:  +46 8 764 35 00 
+
+
+
+System requirements
+===================
+
+The Infovox 230 requirements are the following:
+- 486 DX 33 MHz processor (or higher)
+- 8 MB of memory (16 MB for Windows NT)
+- 10 MB of free disk space to perform a complete installation.
+- Microsoft Windows 95 (or higher) or Microsoft Windows NT 3.51 or higher.
+- A 16-bit sound card or a 16-bit external sound card compatible with the operating system.
+
+The Infovox 330 requirements are the following:
+- Pentium processor (or higher)
+- 16 MB of memory
+- 50 MB of free disk space to perform a complete installation.
+- Microsoft Windows 95 (or higher) or Microsoft Windows NT 3.51 or higher.
+- A 16-bit sound card or a 16-bit external sound card compatible with the operating system.
+
+
+
+Upgrading from Infovox 230 v1.0
+===============================
+
+If you have Infovox 230 version 1.0 installed on your machine, please uninstall it before installing the Infovox 230 v1.12. Note that you do not need to disable the language license you have installed on your machine. Your license will be automatically detected and kept by Infovox 230 v1.12.
+To uninstall Infovox 230 version 1.0, please follow this procedure
+1. Open the Windows Control Panel.
+2. Open the Add/Remove Programs icon.
+3. Find the Infovox 230 Text-to-Speech item in the list, and select it.
+4. Click on the Add/Remove button and then follow the instruction to completely remove the program.
+
+
+
+Upgrading from Infovox 230/330 v1.1 or v1.11
+===============================================
+
+If you own Infovox 230/330 version 1.1 or 1.11, you can install Infovox v1.12 over the old one, with no need to perform any particular operation. If you own a license, your license will be automatically detected and kept by Infovox 230/330 v1.12.
+
+
+
+Intalling the Infovox 230/330
+================================
+
+The installation procedure allows you to install the following items:
+- Infovox 230/330 Text-to-Speech engine v1.12.
+- Infovox 230/330 Speech Application.
+- Infovox 230/330 Speech Clipboard.
+- Infovox 230/330 License Manager.
+- Infovox 230/330 language files.
+- Microsoft Speech API 3.0.
+
+To install the Infovox 230/330 v1.12 you need to have the Infovox distribution CD. Alternatively, you can have Infovox 230/330 installation files on floppy disks or copied onto you hard disk, for instance after having downloaded them from the internet.
+
+Before you install the Infovox 230 v1.12, please make sure that you do not have the Infovox 230 version 1.0 installed. Refer to the section on how to uninstall the Infovox 230 version 1.0 for more information on this subject.
+
+There are no compatibility problems between Infovox 230 and Infovox 330, so you can install and run both engines on your computer at the same time.
+
+Installation of the Infovox 230
+-------------------------------
+1. Select Run from the Start menu of Windows 95 and type: d:\Ivx230\setup, then press OK. If you have copied the installation files on your hard disk, or you have a different drive letter for the CD-ROM reader, substitute "d:\Ivx230" with the appropriate pathname.
+
+A dialog box appears where you are prompted to accept the default directory where the Infovox 230 applications is going to be installed (the default directory is "C:\Program Files\Telia Promotor\Ivx230"). To select a different directory, press the Browse button, enter the new destination path and then press OK.
+
+2. Select a directory and press Next. 
+
+You are now prompted to choose the name of the folder where to store the icons for the Infovox 230 applications. The default name is "Infovox 230 Text-to-Speech".
+
+3. Choose a folder name and then press Next.
+
+You are now prompted to choose which languages you want to install. The default option is to install all available languages.
+
+4. Choose the languages you wish to install and then press Next.
+
+The files are copied to the hard disk. Then you are prompted whether you want to install a 30-days-limited license for all Infovox 230 languages. This means that you will be able to test and use the Infovox 230 languages for 30 days, before actually buying a license. Please note that you cannot install the 30-days-limited license for the Infovox 230 more than once on the same PC.
+
+Installation of the Infovox 330
+-------------------------------
+1. Select Run from the Start menu of Windows 95 and type: d:\Ivx330\setup, then press OK. If you have copied the installation files on your hard disk, or you have a different drive letter for the CD-ROM reader, substitute "d:\Ivx330" with the appropriate pathname.
+
+A dialog box appears where you are prompted to accept the default directory where the Infovox 330 applications is going to be installed (the default directory is "C:\Program Files\Telia Promotor\Ivx330"). To select a different directory, press the Browse button, enter the new destination path and then press OK.
+
+2. Select a directory and press Next. 
+
+You are now prompted to choose the name of the folder where to store the icons for the Infovox 330 applications. The default name is "Infovox 330 Text-to-Speech".
+
+3. Choose a folder name and then press Next.
+
+You are now prompted to choose which languages you want to install. The default option is to install all available languages.
+
+4. Choose the languages you wish to install and then press Next.
+
+The files are copied to the hard disk. Then you are prompted whether you want to install a 30-days-limited license for all Infovox 330 languages. This means that you will be able to test and use the Infovox 330 languages for 30 days, before actually buying a license. Please note that you cannot install the 30-days-limited license for the Infovox 330 more than once on the same PC.
+
+
+
+Uninstalling the Infovox 230/330
+===================================
+
+To uninstall the Infovox 230/330 v1.12 you should always use the Windows Control Panel applet called "Add/Remove Program". 
+The uninstallation of the Infovox 230/330 does not affect the licenses you have. The information about Licenses are left untouched just in case you would like to reinstall the Infovox 230/330 later. If you wish to move/remove your license from the Hard Disk, please refer to the User's Guide for a description of this operation.
+The procedure is completely automatic, you are required to issue an explicit command before the uninstallation only if you use Windows NT.
+
+>> Note for Windows NT computers only:
+
+BEFORE running the "Add/Remove Program" applet you need to perform the following operation:
+1. From the Start menu of Windows NT choose the Run command.
+2. Type the "setup_ck /D" in the Open box.
+3. Click on OK.
+4. If you are asked whether you want to uninstall Crypkey answer Yes.
+This operation will stop the Crypkey service. If you uninstall the Infovox 230/330 without stopping this service, you might get an error message during Windows NT start-up.
+
+
+Uninstall procedure:
+
+If you are using Windows 95 or if you use NT and have already stopped the Crypkey service, then follow this procedure to uninstall the Infovox 230/330.
+
+1. Start the Control Panel. 
+2. In the Control Panel Double-click on the "Add/Remove Programs" icon.
+3. Select "Infovox 230 v1.1" or "Infovox 330 v1.1" in the Add/Remove Programs Properties and click on the Add/Remove button.
+
+
+
+Infovox language licenses
+=========================
+
+In order to properly use any of the Infovox languages you are required to get a language license. You can actually use the languages for which you do not own a license, but you will hear every now and then the sentence "this is a demonstration of text-to-speech synthesis ..." or the current year number. This is done in order to give you a possibility to test the quality of the speech before actually buying a language license.
+
+Starting with version 1.1 of Infovox 230 and 330, the language licenses are delivered as Site Authorization licenses. However, to preserve a complete backward compatibility, the Software Key and Hardware Key licenses are still fully supported in the Windows 95 environment.
+
+For the Infovox 330, or for the NT version of Infovox 230, the Site Authorization license is the only type of license available.
+
+
+
+Buying a language license
+=========================
+
+When you have decided to actually buy a language license, then you should contact your authorized local distributor for the Infovox products (please refer to the current list of authorized distributors on our web site).
+The procedure for getting the language license is the following:
+
+1. Run the License Manager and get your Site Code number.
+2. Send this number to your authorized local distributor via e-mail, fax or telephone. You will then receive a Site Key number from the distributor.
+3. Copy or paste the Site Key number into the License Manager.
+
+To get more information about Site Authorization licenses, Site Keys and Site Codes, please refer to the Site Authorization section in the User's Guide.
+
+
+
+Using a language license received with a previous version of Infovox
+====================================================================
+
+If you already own a language license for Infovox 230/330, then you do not need to perform any particular operation. This language license will be automatically detected and used by the Infovox 230 v1.12.
+
+
+
+The License Manager
+===================
+
+All operations on the Infovox language licenses are handled through the License Manager application. The License Manager is installed by the Infovox setup program.
+
+To start the License Manager:
+
+1. Open the Infovox 230/330 v1.1 program group.
+2. Double-click on the License Manager icon.
+
+The License Manager dialog box appears.
+
+Different Windows 95 and NT version for the Infovox 230
+-------------------------------------------------------
+The License Manager for the Infovox 230 is also available in a separate Windows NT version. If you run Infovox 230 under Windows NT, it is necessary that you use this version of the License Manager. The Infovox 230 Setup program takes care of installing the proper version of the license manager on your computer.
+
+The only difference between the two versions of the License Manager is that in the Windows NT version there is no support for Software Keys and Hardware Keys. This is due to the incompatibility between this type of licenses and Windows NT.
+
+The title of the License Manager Windows will report which version of the License Manager is currently being used. The filenames are:
+- "IvxLM230.exe" for the Windows 95 version.
+- "IvxLM230nt.exe" for the Windows NT version.
+
+
+Basic Site Authorization management
+-----------------------------------
+All operations on the Site Authorization licenses are performed using the controls in the Site Authorization group.
+
+Reading the Site Code
+
+In the Site Code box you can see the current Site Code number for your computer. This number has to be provided to your authorized distributor in order to receive a Site Key and enable your Site Authorization license.
+To make things easier, and to avoid risk for spelling mistakes, you can copy this number in the Windows Clipboard and then paste it in a mail or fax document.
+
+Entering the Site Key
+
+Once you have received the Site Key from your authorized distributor, you can enter it in the License Manager using the Enter Site Key button:
+
+1. Click on the Enter Site Key button.
+The Enter Site Key dialog box will pop up.
+2. Type or paste the Site Key number in the edit box. 
+3. Click on OK.
+
+A message box will came up reporting the result of the operation. In case something goes wrong, please check that the spelling of the Site Key is correct.
+
+After you have entered the Site Key the information in the Site Code box and the license list will be automatically updated.

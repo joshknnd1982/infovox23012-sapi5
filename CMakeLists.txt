@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(Infovox23012SAPI VERSION 1.0.5 LANGUAGES CXX RC)
+project(Infovox23012SAPI VERSION 1.0.6 LANGUAGES CXX RC)
 
 # The Infovox 230 engine is a 32-bit dll, so the worker that owns it is always
 # x86. The SAPI5 engine itself is built twice -- 32-bit for 32-bit hosts and
@@ -154,38 +154,38 @@ ivx_version_stamp(Infovox23012Diag "Infovox 230 v1.12 diagnostics" FALSE)
 
 # ---------------------------------------------------------------------------
 # Staging: everything the installer packages, in the layout it installs.
+#
+# Each binary stages itself when it is linked. They used to be copied together
+# from one target's post-build step, which runs only when that target is
+# relinked: a change to the diagnostics alone built a new Infovox23012Diag.exe
+# and left the old one in output\ for the installer to package, and in a
+# parallel build the copy could run before the others had finished linking. A
+# version bump relinks everything, which is what hid it.
 # ---------------------------------------------------------------------------
 set(IVX_STAGE ${CMAKE_CURRENT_SOURCE_DIR}/output)
 set(IVX_ENGINE_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/bin/engine)
 
+function(ivx_stage target destination)
+    add_custom_command(TARGET ${target} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${destination}
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:${target}> ${destination}/
+        COMMENT "Staging ${target}")
+endfunction()
+
 if(IVX_X64)
-    add_custom_command(TARGET Infovox23012SAPI POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${IVX_STAGE}/x64
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:Infovox23012SAPI> ${IVX_STAGE}/x64/
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:Infovox23012Diag> ${IVX_STAGE}/x64/
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:Infovox23012SapiTest> ${IVX_STAGE}/x64/
-        COMMENT "Staging the 64-bit SAPI5 engine")
+    ivx_stage(Infovox23012SAPI ${IVX_STAGE}/x64)
+    ivx_stage(Infovox23012Diag ${IVX_STAGE}/x64)
+    ivx_stage(Infovox23012SapiTest ${IVX_STAGE}/x64)
 else()
+    ivx_stage(Infovox23012SAPI ${IVX_STAGE})
+    ivx_stage(Infovox23012Server ${IVX_STAGE})
+    ivx_stage(Infovox23012Diag ${IVX_STAGE})
+    ivx_stage(Infovox23012SapiTest ${IVX_STAGE})
+    ivx_stage(Infovox23012Config ${IVX_STAGE})
+
+    # The engine and its rule files go with the worker that loads them.
     add_custom_command(TARGET Infovox23012Server POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E make_directory ${IVX_STAGE}/engine
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:Infovox23012SAPI> ${IVX_STAGE}/
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:Infovox23012Server> ${IVX_STAGE}/
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:Infovox23012Diag> ${IVX_STAGE}/
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:Infovox23012SapiTest> ${IVX_STAGE}/
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            ${IVX_ENGINE_SOURCE} ${IVX_STAGE}/engine
-        COMMENT "Staging the 32-bit engine, worker and voice data")
-
-    add_custom_command(TARGET Infovox23012Config POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E make_directory ${IVX_STAGE}
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            $<TARGET_FILE:Infovox23012Config> ${IVX_STAGE}/
-        COMMENT "Staging the configuration utility")
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${IVX_ENGINE_SOURCE} ${IVX_STAGE}/engine
+        COMMENT "Staging the engine and its voice data")
 endif()

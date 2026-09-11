@@ -169,6 +169,48 @@ highlighting still lands on the right word.
 
 ## Releases
 
+**1.0.6** — no more hiss in place of speech when the volume is turned down.
+
+Reported as: "when using the Spanish language, sometimes when saying numbers in
+the 90s, at the second half of the utterance, the speech is cut off and replaced
+with a static hiss of white noise for about 250 to 500ms."
+
+It was not Spanish, and it was not numbers. Loudness is applied to the samples by
+the worker (see [What the engine can and cannot do](#what-the-engine-can-and-cannot-do)),
+and it scaled each chunk of audio exactly as the engine handed it over. Those
+chunks do not always end on a sample boundary — the same fact 1.0.1 dealt with on
+the SAPI5 side — so after an odd-sized chunk the scaling multiplied together bytes
+from two different samples. From that chunk to the next odd one, what came out
+was samples as good as random: white noise at around 19000 RMS, several times as
+loud as the speech it replaced. At 100% volume nothing is scaled, which is why it
+came and went. It needed the volume below 100%, and a rate and a sentence that
+happened to produce odd chunks; Castilian Spanish "90 91 … 99" at SAPI rate 3 and
+80% volume is one of those, and lost 270 ms and then 410 ms to it.
+
+Measured through the worker in all twelve languages, two sentences at all
+twenty-one rates, each rendered at 100% and at 70% volume:
+
+| | pairs with hiss | languages | longest |
+| --- | --- | --- | --- |
+| before | 114 of 504 | all twelve | 710 ms |
+| after | **0 of 504** | none | — |
+
+A part sample is now held back and put on the front of the next chunk, so what is
+scaled is always whole samples. The engine's own count of what it has produced is
+untouched, so word and bookmark positions are exactly where they were.
+
+`Infovox23012Diag volume` is the regression check. It has one voice of each
+language say the same words at every rate, at full volume and at a lower one, and
+fails if anything in the quiet render is louder than the loud render at its
+loudest, turned down — which scaling cannot do, however far the engine's timing
+drifts between the two runs. It needs no administrator.
+
+*And one thing found on the way.* The build copied every binary into `output\` from
+one target's post-build step, which runs only when that target is relinked — so a
+change to the diagnostics alone produced a new `Infovox23012Diag.exe` and left the
+old one there for the installer to package. A version bump relinks everything,
+which is what hid it. Each binary now stages itself.
+
 **1.0.5** — an ellipsis no longer stops the voice for three seconds.
 
 Reported as: "when the engine encounters a word followed by an ellipsis there is
@@ -470,7 +512,8 @@ Two more things worth knowing:
   relying on what the last one left behind.
 - Loudness is handed to the audio *device* (`IAudio::LevelSet`), not applied to
   the samples. A capture sink that only stores the level makes every volume
-  control a silent no-op, so the sink scales the PCM itself.
+  control a silent no-op, so the sink scales the PCM itself — in whole samples,
+  because the chunks it is handed do not end on sample boundaries. See 1.0.6.
 
 ## Building
 

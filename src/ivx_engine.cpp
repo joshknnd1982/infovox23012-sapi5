@@ -345,12 +345,39 @@ public:
                   static_cast<unsigned long>(dwSize),
                   static_cast<unsigned long>(GetTickCount64() - begin_tick_));
         if (pBuffer && dwSize) {
-            const void* data = pBuffer;
-            if (gain_ < 0.999) {
-                data = apply_gain(pBuffer, dwSize);
+            // The engine's chunks do not end on sample boundaries. For some text
+            // at some rates a chunk is an odd number of bytes, and the one after
+            // it starts with the second half of a sample. Scaling a chunk as it
+            // came therefore multiplied pairs of bytes that belong to two
+            // different samples, and everything from one odd chunk to the next
+            // came out as white noise louder than the speech it replaced. That
+            // is the hiss heard in place of speech at any volume below 100%:
+            // Castilian Spanish "90 91 ... 99" at SAPI rate 3 and 80% volume
+            // lost 270 and 410 ms at a time to it, and at 100% it was fine only
+            // because nothing was scaled. The SAPI5 engine learned the same
+            // thing in 1.0.1 (see feed_audio); this is the one other place that
+            // reads the bytes as samples.
+            //
+            // So a part sample is held back and put on the front of the next
+            // chunk, and what is scaled and passed on is always whole samples.
+            // written_ still counts what the engine handed over, because that is
+            // what its own positions and its pacing are measured against.
+            const BYTE* data = static_cast<const BYTE*>(pBuffer);
+            size_t size = dwSize;
+            const size_t block = block_align();
+            if (!carry_.empty() || size % block != 0) {
+                joined_.assign(carry_.begin(), carry_.end());
+                joined_.insert(joined_.end(), data, data + size);
+                const size_t whole = joined_.size() - joined_.size() % block;
+                carry_.assign(joined_.begin() + static_cast<std::ptrdiff_t>(whole), joined_.end());
+                data = joined_.data();
+                size = whole;
             }
-            if (sink_ && !sink_(data, dwSize)) {
-                consumer_gone_ = true;
+            if (size) {
+                const void* out = gain_ < 0.999 ? apply_gain(data, size) : data;
+                if (sink_ && !sink_(out, static_cast<unsigned long>(size))) {
+                    consumer_gone_ = true;
+                }
             }
             written_ += dwSize;
         }
@@ -384,9 +411,23 @@ public:
         sink_ = sink;
         written_ = 0;
         consumer_gone_ = false;
+        carry_.clear();
         begin_tick_ = GetTickCount64();
     }
-    void end() { sink_ = nullptr; }
+    void end()
+    {
+        // Every utterance starts on a sample boundary, so a part sample still
+        // held when one ends has no other half coming. It is dropped rather than
+        // put on the front of the next utterance, where it would shift every
+        // sample of that one by a byte.
+        if (!carry_.empty()) {
+            IVX_DEBUG("audio: dropped %u byte(s) of a part sample left at the end of the "
+                      "utterance",
+                      static_cast<unsigned>(carry_.size()));
+            carry_.clear();
+        }
+        sink_ = nullptr;
+    }
 
     unsigned long written() const { return static_cast<unsigned long>(written_); }
     bool consumer_gone() const { return consumer_gone_; }
@@ -396,14 +437,22 @@ public:
 private:
     ~CaptureAudio() = default;
 
-    // Scales a chunk into a scratch buffer. The engine reuses the buffer it
-    // hands us, so the samples cannot be modified in place; the length never
+    // Bytes in one sample frame, in the two formats apply_gain knows: 8-bit, or
+    // else 16-bit, which is what this engine always chooses.
+    size_t block_align() const
+    {
+        const size_t bytes = (have_format_ && wfx_.wBitsPerSample == 8) ? 1 : 2;
+        const size_t channels = (have_format_ && wfx_.nChannels) ? wfx_.nChannels : 1;
+        return bytes * channels;
+    }
+
+    // Scales whole samples into a scratch buffer. The engine reuses the buffer
+    // it hands us, so the samples cannot be modified in place; the length never
     // changes, which keeps the byte offsets used for word and bookmark
     // positions valid.
-    const void* apply_gain(void* buffer, DWORD size)
+    const void* apply_gain(const BYTE* buffer, size_t size)
     {
-        scratch_.assign(static_cast<const BYTE*>(buffer),
-                        static_cast<const BYTE*>(buffer) + size);
+        scratch_.assign(buffer, buffer + size);
 
         if (gain_ <= 0.0005) {
             // True silence. 8-bit PCM is unsigned and centred on 0x80.
@@ -442,6 +491,10 @@ private:
     bool consumer_gone_ = false;
     PcmSink sink_;
     std::vector<BYTE> scratch_;
+    // Less than one whole sample, held back from the end of a chunk for the
+    // front of the next one; and where the two are put together. See DataSet.
+    std::vector<BYTE> carry_;
+    std::vector<BYTE> joined_;
 };
 
 class BufNotifySink : public ITTSBufNotifySink {

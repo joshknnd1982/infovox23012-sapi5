@@ -13,6 +13,7 @@
 //   Infovox23012Diag all <outdir>                direct, every voice
 //   Infovox23012Diag worker <out.wav> [text]     through the worker
 //   Infovox23012Diag workerall <outdir>          through the worker, every voice
+//   Infovox23012Diag volume [text]               a lower volume changes only the volume
 //   Infovox23012Diag register | unregister       publish the voices to SAPI5
 //
 // Options: --voice NAME, --rate N, --pitch N, --volume N (0-100),
@@ -21,6 +22,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <string>
@@ -180,6 +182,7 @@ void print_usage()
 #endif
            "  Infovox23012Diag worker <out.wav> [text]  through the worker, as SAPI5 does\n"
            "  Infovox23012Diag workerall <outdir>       through the worker, every voice\n"
+           "  Infovox23012Diag volume [text]            a lower volume changes only the volume\n"
            "  Infovox23012Diag latency [N]              time to first audio, N times\n"
            "  Infovox23012Diag stop                     stop the worker\n"
            "\n"
@@ -428,6 +431,148 @@ int run_worker(const std::wstring& command, const std::vector<std::wstring>& pos
         return (lost || slow) ? 6 : 0;
     }
 
+    // Whether turning the volume down changes anything but the volume.
+    //
+    // The worker scales the samples itself, because the engine hands loudness to
+    // its audio device rather than applying it. Up to 1.0.5 it scaled each chunk
+    // exactly as the engine delivered it, and those chunks do not always end on a
+    // sample boundary: after one that did not, it multiplied together bytes from
+    // two different samples, which is white noise louder than the speech it
+    // replaced, until the next odd chunk put it back in step. At 100% nothing is
+    // scaled, so nothing went wrong; below it, whether and where it did depended
+    // on the rate and the words. It was reported as Castilian Spanish numbers in
+    // the nineties turning into a hiss, and it was every language.
+    //
+    // So each voice says the same words at every rate twice, at full volume and
+    // at a lower one, and nothing in the quiet one may be louder than the loud
+    // one at its loudest, turned down. Anything that is was changed rather than
+    // scaled. There is no noise detector to tune, so it means the same thing in
+    // every language.
+    if (command == L"volume") {
+        const int quiet = opt.volume < 100 ? (std::max)(1, opt.volume) : 70;
+        const std::wstring text =
+            positional.size() > 1 ? positional[1] : L"90 91 92 93 94 95 96 97 98 99";
+
+        // One voice per language unless one is named, which keeps a whole run
+        // to a couple of minutes.
+        std::vector<const ivx::Voice*> voices;
+        if (!opt.voice.empty()) {
+            const int index = catalog.find_by_name(opt.voice);
+            if (index < 0) {
+                wprintf(L"No voice called \"%s\". Run 'list' to see them.\n", opt.voice.c_str());
+                return 5;
+            }
+            voices.push_back(&catalog.voices()[static_cast<size_t>(index)]);
+        } else {
+            for (const ivx::Voice& v : catalog.voices()) {
+                const bool have_language =
+                    std::any_of(voices.begin(), voices.end(),
+                                [&v](const ivx::Voice* w) { return w->lcid == v.lcid; });
+                if (!have_language) {
+                    voices.push_back(&v);
+                }
+            }
+        }
+
+        // The level of every 20 ms, taken every 10 ms.
+        const size_t per_second = format.samples_per_sec ? format.samples_per_sec : 16000;
+        const size_t frame = per_second / 50;
+        const size_t hop = per_second / 100;
+
+        auto render = [&](const ivx::Voice& v, int rate, int volume,
+                          std::vector<double>* levels) -> bool {
+            std::vector<BYTE> audio;
+            ivx::SpeakRequest request = {};
+            strncpy_s(request.mode_guid, v.mode_guid.c_str(), _TRUNCATE);
+            request.rate_step = rate;
+            request.pitch_step = opt.pitch;
+            request.volume_pct = volume;
+            request.timeout_ms = 180000;
+            ivx::DoneResponse done = {};
+            const bool ok = client.speak(
+                request, text,
+                [&](const void* data, unsigned long n) {
+                    const BYTE* p = static_cast<const BYTE*>(data);
+                    audio.insert(audio.end(), p, p + n);
+                    return true;
+                },
+                [](const ivx::EventResponse&) {}, [](const ivx::FormatResponse&) {}, &done);
+
+            levels->clear();
+            const size_t count = audio.size() / sizeof(short);
+            const short* samples = reinterpret_cast<const short*>(audio.data());
+            for (size_t i = 0; i + frame <= count; i += hop) {
+                double sum = 0;
+                for (size_t k = 0; k < frame; ++k) {
+                    sum += static_cast<double>(samples[i + k]) * samples[i + k];
+                }
+                levels->push_back(sqrt(sum / frame));
+            }
+            return ok && done.status == ivx::DONE_COMPLETE && !levels->empty();
+        };
+
+        wprintf(L"\"%s\" at every rate, at 100%% volume and at %d%%.\n"
+                L"The quiet one must never be louder than the loud one.\n\n",
+                text.c_str(), quiet);
+
+        int failures = 0;
+        int incomplete = 0;
+        for (const ivx::Voice* v : voices) {
+            std::wstring findings;
+            for (int rate = -10; rate <= 10; ++rate) {
+                if (opt.rate_given && rate != opt.rate) {
+                    continue;
+                }
+                std::vector<double> loud;
+                std::vector<double> soft;
+                if (!render(*v, rate, 100, &loud) || !render(*v, rate, quiet, &soft)) {
+                    ++incomplete;
+                    findings += L"  " + std::to_wstring(rate) + L": did not complete";
+                    continue;
+                }
+
+                // Turning the volume down scales every sample, so nothing in the
+                // quiet render can be louder than the loud one at its loudest,
+                // turned down by the same amount -- wherever in the utterance it
+                // falls. That matters, because this engine's timing is not the
+                // same from one run to the next: at the slowest rate two renders
+                // of the same words drift a tenth of a second apart, and
+                // comparing them moment by moment calls that a fault. The hiss
+                // clears the bar easily: the samples it is made of are as good as
+                // random, around 19000 RMS whatever the volume, and the loudest
+                // speech measured at 70% is under half of that. A quarter above
+                // the ceiling, and a little more, keeps the few low bits this
+                // engine varies by from counting.
+                const double loudest = *std::max_element(loud.begin(), loud.end());
+                const double ceiling = 1.25 * (quiet / 100.0) * loudest + 300.0;
+                size_t run = 0;
+                size_t longest = 0;
+                for (const double level : soft) {
+                    if (level > ceiling) {
+                        longest = (std::max)(longest, ++run);
+                    } else {
+                        run = 0;
+                    }
+                }
+                if (longest) {
+                    ++failures;
+                    findings += L"  " + std::to_wstring(rate) + L": " +
+                                std::to_wstring(longest * 10 + 10) + L" ms";
+                }
+            }
+            wprintf(L"%-40S %s\n", v->display_name.c_str(),
+                    findings.empty() ? L"clean at every rate"
+                                     : (L"LOUDER at rate" + findings).c_str());
+        }
+
+        wprintf(L"\n%s\n", failures     ? L"FAILED: turning the volume down changed the audio, "
+                                          L"not just its level."
+                           : incomplete ? L"Some utterances did not complete."
+                                        : L"Turning the volume down changes nothing but the "
+                                          L"volume.");
+        return (failures || incomplete) ? 6 : 0;
+    }
+
     if (command == L"worker") {
         if (positional.size() < 2) {
             print_usage();
@@ -537,7 +682,7 @@ int wmain(int argc, wchar_t** argv)
     }
 
     if (command == L"worker" || command == L"workerall" || command == L"latency" ||
-        command == L"churn") {
+        command == L"churn" || command == L"volume") {
         printf("\n");
         return run_worker(command, positional, opt, catalog);
     }

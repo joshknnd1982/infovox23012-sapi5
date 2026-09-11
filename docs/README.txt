@@ -374,6 +374,26 @@ from.
 What changed
 ------------
 
+1.0.6  No more hiss in place of speech when the volume is turned down.
+
+       With the volume below 100%, speech could stop part-way through and
+       be replaced by a loud hiss for a quarter to half a second, sometimes
+       more. It was reported with Castilian Spanish numbers in the nineties,
+       but it could happen in any of the twelve languages, at a handful of
+       speaking rates, depending on the words. At 100% volume it never
+       happened, which is why it seemed to come and go.
+
+       The engine hands its audio over in pieces that do not always end on
+       a whole sample, and turning the volume down worked on each piece as
+       it came -- so after an uneven piece it was scaling halves of two
+       different samples as if they were one, and what came out was noise.
+       The pieces are now put back together before the volume is applied.
+       Measured in all twelve languages at every speaking rate, a lower
+       volume now changes nothing but the volume.
+
+       Check it on your own machine, with no administrator needed:
+         Infovox23012Diag volume
+
 1.0.5  An ellipsis no longer stops the voice for three seconds.
 
        A word followed by "..." was followed by about two and a half
@@ -481,6 +501,10 @@ be placed:
                                            program
   Infovox23012Diag latency [N]             how long from asking to the first
                                            sample, N times
+  Infovox23012Diag volume                  says the same words at every rate,
+                                           at full volume and at a lower one,
+                                           and checks the lower one is only
+                                           quieter
   Infovox23012Diag stop                    stops the background program
 
 If "speak" works but "worker" does not, the engine is fine and the problem is in

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "ivx_log.h"
+#include "ivx_pitch.h"
 #include "ivx_vregistry.h"
 
 namespace ivx {
@@ -998,9 +999,11 @@ bool Engine::select(const std::string& mode_guid)
 
     query_ranges();
     selected_guid_ = mode_guid;
-    IVX_INFO("engine: selected %s (features 0x%lX), rate %d..%d default %d, pitch %d..%d default %d",
+    IVX_INFO("engine: selected %s (features 0x%lX), rate %d..%d default %d, "
+             "pitch %d..%d default %d (the voice's Pitch %d, spoken at %d)",
              mode_guid.c_str(), selected_features_, rate_min_, rate_max_, rate_default_, pitch_min_,
-             pitch_max_, pitch_default_);
+             pitch_max_, pitch_default_, pitch::param_behind(pitch_default_),
+             pitch::selected_param(pitch_default_));
     return true;
 }
 
@@ -1185,9 +1188,11 @@ std::wstring format_prologue(int rate_wpm, int pitch_hz, int volume_pct)
         static_cast<unsigned short>((clamped_volume * 0xFFFF + 50) / 100);
     const unsigned long stereo = (static_cast<unsigned long>(level) << 16) | level;
 
+    const int pitch_tag = pitch::tag_value(pitch::selected_param(pitch_hz));
+
     wchar_t buf[96];
     _snwprintf_s(buf, _countof(buf), _TRUNCATE, L"\\Spd=%d\\\\Pit=%d\\\\Vol=%lu\\", rate_wpm,
-                 pitch_hz, stereo);
+                 pitch_tag, stereo);
     return buf;
 }
 

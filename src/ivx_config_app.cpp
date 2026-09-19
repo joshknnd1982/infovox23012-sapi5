@@ -638,8 +638,8 @@ struct VoiceDialogData {
 };
 
 const wchar_t kVoiceHint[] =
-    L"Pitch is the engine's own number, not hertz: the engine works out the pitch as "
-    L"three times Pitch, minus 49, and keeps the result between 30 and 250 hertz. The "
+    L"Pitch is the engine's own number, not hertz. Each step is about 3 hertz -- 50 is "
+    L"101 hertz -- and the engine goes no lower than 30 hertz and no higher than 250. The "
     L"male voices use 50, the female voices 73, the child voices 90.\r\n"
     L"\r\n"
     L"Loudness (Dynamic) makes the delivery more forceful and more strongly stressed as it "
@@ -1030,6 +1030,13 @@ const wchar_t kEngineHint[] =
     L"words a minute, and 30 to 250 hertz. Setting a lower fastest rate spreads the "
     L"remaining range over the same number of steps, which makes the control finer.\r\n"
     L"\r\n"
+    L"Control tags are the engine's own commands, written into the text the way SAPI 4 "
+    L"programs allowed: \\Pit=30\\ for a very deep voice, \\Spd=\\ for speed, \\Vol=\\ for "
+    L"loudness, \\Pau=\\ for a pause in milliseconds, \\Rst\\ to go back to the voice's own "
+    L"settings, \\Vce=Speaker=\"name\"\\ for another voice. One lasts until the end of what "
+    L"the program hands over in one go. Turn this off if a program reads text that happens "
+    L"to contain them.\r\n"
+    L"\r\n"
     L"Log detail is written to the log file in your profile. Level 5 is the one to use when "
     L"reporting a problem. A program reads the setting when it starts speaking, so restart "
     L"the speaking program after changing it.";
@@ -1048,6 +1055,7 @@ void put_engine_values(HWND dlg, const EngineSettings& settings, int log_level)
                    settings.collapse_repeated_punctuation ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(dlg, IDC_E_WORDS, settings.word_events ? BST_CHECKED : BST_UNCHECKED);
     CheckDlgButton(dlg, IDC_E_SENTENCES, settings.sentence_events ? BST_CHECKED : BST_UNCHECKED);
+    CheckDlgButton(dlg, IDC_E_CONTROL_TAGS, settings.control_tags ? BST_CHECKED : BST_UNCHECKED);
     set_spin(dlg, IDC_E_THRESHOLD_SPIN, 0, 1000, settings.silence_threshold);
     set_spin(dlg, IDC_E_ONSET_FADE_SPIN, 0, 50, settings.onset_fade_ms);
     set_text(dlg, IDC_E_TIMEOUT, number(settings.timeout_base_ms));
@@ -1111,6 +1119,7 @@ INT_PTR CALLBACK engine_proc(HWND dlg, UINT message, WPARAM wparam, LPARAM lpara
                         IsDlgButtonChecked(dlg, IDC_E_COLLAPSE) == BST_CHECKED;
                     s.word_events = IsDlgButtonChecked(dlg, IDC_E_WORDS) == BST_CHECKED;
                     s.sentence_events = IsDlgButtonChecked(dlg, IDC_E_SENTENCES) == BST_CHECKED;
+                    s.control_tags = IsDlgButtonChecked(dlg, IDC_E_CONTROL_TAGS) == BST_CHECKED;
                     s.silence_threshold =
                         clamp(to_int(text_of(dlg, IDC_E_THRESHOLD), 16), 0, 32767);
                     s.onset_fade_ms =

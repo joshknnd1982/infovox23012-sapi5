@@ -50,6 +50,7 @@ private:
     struct Run {
         std::wstring tagged;
         std::vector<uint32_t> source;
+        std::string mode_guid;
         int rate_step = 0;
         int pitch_step = 0;
         int volume_pct = 100;

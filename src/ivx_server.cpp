@@ -24,7 +24,9 @@
 #include "ivx_engine.h"
 #include "ivx_log.h"
 #include "ivx_paths.h"
+#include "ivx_pitch.h"
 #include "ivx_protocol.h"
+#include "ivx_tags.h"
 
 namespace {
 
@@ -348,8 +350,11 @@ void run_job(Job* job)
         step_to_value(job->pitch_step, chosen(settings.pitch_min, g_engine.pitch_min()),
                       chosen(settings.pitch_max, g_engine.pitch_max()),
                       chosen(settings.pitch_default, g_engine.pitch_default()));
-    IVX_DEBUG("server: rate step %d -> %d wpm, pitch step %d -> %d Hz, volume %d%%",
-              job->rate_step, rate, job->pitch_step, pitch, job->volume_pct);
+    const int pitch_param = ivx::pitch::selected_param(pitch);
+    IVX_DEBUG("server: rate step %d -> %d wpm, pitch step %d -> %d Hz (Pitch %d, \\Pit=%d\\), "
+              "volume %d%%",
+              job->rate_step, rate, job->pitch_step, pitch, pitch_param,
+              ivx::pitch::tag_value(pitch_param), job->volume_pct);
 
     bool ok;
     if (job->kind == Job::Phonemes) {
@@ -373,6 +378,12 @@ void run_job(Job* job)
                     IVX_ERROR("server: still silent after a recycle");
                 }
             }
+        }
+
+        if (ivx::tags::changes_voice(job->text) && !g_engine.selected().empty()) {
+            const std::string guid = g_engine.selected();
+            IVX_DEBUG("server: the text changed the voice; selecting %s again", guid.c_str());
+            g_engine.select(guid);
         }
     }
 

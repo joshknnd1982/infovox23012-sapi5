@@ -477,7 +477,7 @@ python tools/check_accessibility.py output\Infovox23012Config.exe
 
 That runs the utility, walks all three dialogs through `IAccessible` — the same
 interface NVDA and JAWS read — and through `GetNextDlgTabItem`, which is the tab
-route itself. Across the three: **62 interactive controls, none without an
+route itself. Across the three: **63 interactive controls, none without an
 accessible name, none off the tab route.** The one control Windows skips is
 "Stop speaking", because it is disabled until there is something to stop.
 
@@ -488,6 +488,26 @@ Measured against this engine rather than assumed.
 Works: `\Spd=` rate, `\Pit=` pitch, `\Vol=` volume, `\mrk=` bookmarks,
 word-position reporting, sentence boundaries, and phoneme input in both IPA and
 the engine's own alphabet — which is what a pronunciation dictionary uses.
+
+As under SAPI4, a program can also write the tags into the text it hands over:
+`\Pit=30\` in Balabolka gives a deeper voice than any pitch control reaches,
+and `\Vce=Speaker="Swedish Female"\` changes voice. All of the engine's tags
+except `\Eng` are obeyed, but only when exactly well formed, so a path such as
+`C:\Windows\System32` is still read out. A tag lasts to the end of what the
+program hands over in one go, and then the program's own voice and settings
+come back; `\Pau=` becomes real silence and `\Mrk=` a SAPI5 bookmark. The
+`ControlTags` setting turns this off.
+
+`\Vce=` takes `Speaker`, `Language`, `Accent`, `Gender` and `Age`. The engine
+changes voice on `Speaker` and `Language` itself, but then drops the rate and
+pitch the program asked for, so those are carried out here instead: the text is
+split at the tag, and the rest goes to the voice named exactly as if the program
+had chosen it, at the rate, pitch and volume the program asked for. `Speaker` is
+one of this engine's own voices, by its name or the first name containing it;
+`Language` keeps the kind of voice, so Swedish Male becomes German Male.
+`Gender` and `Age` go to the engine, which adjusts the voice in use rather than
+changing to another one, and needs their values in quotes, which are added when
+left out.
 
 Does not work, and is handled here instead: `\Pau=` produces no pause at all
 (`\Pau=1000\` gives audio the same length as no tag), so silence is generated as
@@ -505,11 +525,18 @@ Two more measured facts about it that decide how it has to be driven:
   padding stacks; the padding after the last one is the trailing silence that
   gets trimmed.
 
-Two more things worth knowing:
+Three more things worth knowing:
 
 - A control tag changes engine state **permanently**, across utterances. Every
   utterance therefore states its rate, pitch and volume in full rather than
   relying on what the last one left behind.
+- **`\Pit=` is not hertz.** `ITTSAttributes` gives pitch in hertz — Pitch 50
+  is reported as 101 Hz — but the tag sets the engine's Pitch to
+  `trunc(N × 100 / 220)`, so `\Pit=101\` is Pitch 45. `PitchGet` and `PitchSet`
+  also truncate in opposite directions, and selecting a voice goes through the
+  engine's own `PitchSet`, so a voice whose Pitch is 50 speaks at 49. The
+  prologue sets pitch exactly as `PitchSet` would; the arithmetic is in
+  [`src/ivx_pitch.h`](src/ivx_pitch.h).
 - Loudness is handed to the audio *device* (`IAudio::LevelSet`), not applied to
   the samples. A capture sink that only stores the level makes every volume
   control a silent no-op, so the sink scales the PCM itself — in whole samples,

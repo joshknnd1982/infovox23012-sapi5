@@ -27,7 +27,9 @@ Start menu, under "Infovox 230 v1.12":
 
   Infovox 230 v1.12 Configuration  define voices of your own, and change every
                                    setting the engine has
-  Speak a test sentence            speaks aloud with the first Infovox voice
+  Speak a test sentence            says how many voices are installed, with
+                                   American English Male, British English Male
+                                   or the first Male voice, whichever is there
   List the Infovox voices          prints every voice, its language and gender
   Refresh the voice list           republishes the voices after editing
                                    voices.ini

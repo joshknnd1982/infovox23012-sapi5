@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -32,6 +33,8 @@ struct Voice {
     std::wstring language;
     std::wstring gender;
     std::wstring vendor;
+    std::wstring mode;
+    bool user_defined = false;
     ISpObjectToken* token = nullptr;
 };
 
@@ -87,6 +90,8 @@ bool collect_voices(std::vector<Voice>* out, bool infovox_only)
         v.language = attribute(token, L"Language");
         v.gender = attribute(token, L"Gender");
         v.vendor = attribute(token, L"Vendor");
+        v.mode = attribute(token, L"InfovoxModeGUID");
+        v.user_defined = attribute(token, L"InfovoxUserDefined") == L"1";
         if (infovox_only && _wcsicmp(v.vendor.c_str(), L"Infovox") != 0) {
             token->Release();
             continue;
@@ -358,6 +363,48 @@ long file_size(const std::wstring& path)
         return -1;
     }
     return static_cast<long>(data.nFileSizeLow);
+}
+
+std::wstring installed_sentence(const std::vector<Voice>& voices)
+{
+    std::set<std::wstring> modes;
+    std::set<std::wstring> languages;
+    for (const Voice& v : voices) {
+        modes.insert(v.mode);
+        languages.insert(v.language);
+    }
+    const bool one = modes.size() == 1;
+    return L"Infovox two thirty is installed and working. " + std::to_wstring(modes.size()) +
+           (one ? L" voice in " : L" voices in ") + std::to_wstring(languages.size()) +
+           (languages.size() == 1 ? L" language " : L" languages ") + (one ? L"is" : L"are") +
+           L" now available to any program that uses Windows speech.";
+}
+
+const Voice* voice_named(const std::vector<Voice>& voices, const std::wstring& name)
+{
+    for (const Voice& v : voices) {
+        if (_wcsicmp(v.name.c_str(), name.c_str()) == 0) {
+            return &v;
+        }
+    }
+    return nullptr;
+}
+
+const Voice* test_voice(const std::vector<Voice>& voices)
+{
+    for (const wchar_t* name :
+         {L"Infovox 1.12 American English Male", L"Infovox 1.12 British English Male"}) {
+        if (const Voice* v = voice_named(voices, name)) {
+            return v;
+        }
+    }
+    for (const Voice& v : voices) {
+        if (!v.user_defined && v.name.size() > 5 &&
+            _wcsicmp(v.name.c_str() + v.name.size() - 5, L" Male") == 0) {
+            return &v;
+        }
+    }
+    return &voices.front();
 }
 
 // --- the sandbox, which is how this is tested before it is installed ---------
@@ -917,20 +964,12 @@ int wmain(int argc, wchar_t** argv)
         // Speaks aloud through the default audio device. This is what the
         // installer offers at the end: for someone who cannot see the wizard,
         // hearing the voice is the confirmation that it installed correctly.
-        const Voice* chosen = &voices[0];
-        if (!want_voice.empty()) {
-            for (const Voice& v : voices) {
-                if (_wcsicmp(v.name.c_str(), want_voice.c_str()) == 0) {
-                    chosen = &v;
-                    break;
-                }
-            }
+        const Voice* chosen = want_voice.empty() ? nullptr : voice_named(voices, want_voice);
+        if (!chosen) {
+            chosen = test_voice(voices);
         }
         const std::wstring text =
-            positional.size() > 1
-                ? positional[1]
-                : L"Infovox two thirty is installed and working. Sixty voices in twelve "
-                  L"languages are now available to any program that uses Windows speech.";
+            positional.size() > 1 ? positional[1] : installed_sentence(voices);
         hr = voice->SetVoice(chosen->token);
         if (FAILED(hr)) {
             wprintf(L"SetVoice failed: 0x%08lX\n", hr);

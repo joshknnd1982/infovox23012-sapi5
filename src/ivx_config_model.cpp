@@ -216,11 +216,23 @@ void VoiceFile::load(Scope scope)
         VoiceEdit edit;
         edit.name = name;
         edit.from_file = true;
-        edit.builtin = catalog().find_by_name(name) >= 0 &&
-                       !catalog().voices()[static_cast<size_t>(catalog().find_by_name(name))]
-                            .user_defined;
+        const std::vector<Voice>& voices = catalog().voices();
+        const int known = catalog().find_by_name(name);
+        edit.builtin = known >= 0 && !voices[static_cast<size_t>(known)].user_defined;
+        if (edit.builtin) {
+            edit.name = widen(voices[static_cast<size_t>(known)].display_name);
+            if (_wcsicmp(edit.name.c_str(), name.c_str()) != 0) {
+                removed_.push_back(name);
+            }
+        }
         for (int key = 0; key < KEY_COUNT; ++key) {
             edit.values[key] = read_key(path_, name, kVoiceKeyNames[key]);
+        }
+        if (edit.has(KEY_BASED_ON)) {
+            const int base = catalog().find_by_name(edit.get(KEY_BASED_ON));
+            if (base >= 0) {
+                edit.set(KEY_BASED_ON, widen(voices[static_cast<size_t>(base)].display_name));
+            }
         }
         entries_.push_back(edit);
     }

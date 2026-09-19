@@ -333,7 +333,7 @@ A section named after a built-in voice does two things: it changes that voice,
 and it asks for it. So if the installer left out, say, American English Child
 but you installed American English, adding
 
-  [Infovox 1.12 American English Child]
+  [Infovox230 1.12 American English Child]
   Pitch = 92
 
 to voices.ini puts that voice back as well as raising its pitch. A section

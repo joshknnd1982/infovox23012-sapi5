@@ -393,7 +393,7 @@ const Voice* voice_named(const std::vector<Voice>& voices, const std::wstring& n
 const Voice* test_voice(const std::vector<Voice>& voices)
 {
     for (const wchar_t* name :
-         {L"Infovox 1.12 American English Male", L"Infovox 1.12 British English Male"}) {
+         {L"Infovox230 1.12 American English Male", L"Infovox230 1.12 British English Male"}) {
         if (const Voice* v = voice_named(voices, name)) {
             return v;
         }
@@ -662,7 +662,7 @@ int wmain(int argc, wchar_t** argv)
             }
         }
         sandbox_remove();
-        if (!sandbox_install(L"Infovox 1.12 sandbox", want_mode, L"409")) {
+        if (!sandbox_install(L"Infovox230 1.12 sandbox", want_mode, L"409")) {
             CoUninitialize();
             return 4;
         }
@@ -769,7 +769,7 @@ int wmain(int argc, wchar_t** argv)
                   L"the Windows speech interface.";
         int rc = 4;
         sandbox_remove();
-        if (sandbox_install(L"Infovox 1.12 sandbox", want_mode, L"409")) {
+        if (sandbox_install(L"Infovox230 1.12 sandbox", want_mode, L"409")) {
             ISpObjectToken* token = sandbox_token();
             ISpVoice* v = nullptr;
             if (token && SUCCEEDED(CoCreateInstance(CLSID_SpVoice, nullptr, CLSCTX_ALL,

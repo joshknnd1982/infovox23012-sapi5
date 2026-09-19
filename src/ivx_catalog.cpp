@@ -93,10 +93,11 @@ std::vector<std::string> ini_section_keys(const std::wstring& path, const wchar_
 }
 
 // Trims a display name down to something that can follow a language name: the
-// "Infovox 1.12" prefix and any language name already in it are redundant, and only
-// letters, digits and single spaces survive. Any of the twelve language names
-// is stripped, not just this voice's, so "Infovox 1.12 American English Male" moved
-// to French becomes "French Male" rather than "French American English Male".
+// "Infovox230 1.12" or "Infovox 1.12" prefix and any language name already in it
+// are redundant, and only letters, digits and single spaces survive. Any of the
+// twelve language names is stripped, not just this voice's, so "Infovox230 1.12
+// American English Male" moved to French becomes "French Male" rather than
+// "French American English Male".
 std::string mode_suffix(const std::string& display, const std::string& language)
 {
     std::string text = display;
@@ -109,7 +110,9 @@ std::string mode_suffix(const std::string& display, const std::string& language)
             text.erase(0, prefix.size() + 1);
         }
     };
+    strip_prefix("Infovox230 1.12");
     strip_prefix("Infovox 1.12");
+    strip_prefix("Infovox230");
     strip_prefix("Infovox");
     strip_prefix(language);
     for (const BuiltinVoice& b : kBuiltinVoices) {
@@ -373,7 +376,7 @@ void Catalog::apply_installed_selection(const std::wstring& install_dir)
         }
         for (const std::string& name : chosen) {
             // The engine's name for it ("Danish Female") is what the installer
-            // writes; the name Windows shows ("Infovox Danish Female") is
+            // writes; the name Windows shows ("Infovox230 1.12 Danish Female") is
             // accepted too, so a file edited by hand works either way.
             if (_stricmp(name.c_str(), v.mode_key.c_str()) == 0 ||
                 _stricmp(name.c_str(), v.display_name.c_str()) == 0) {
@@ -578,7 +581,10 @@ int Catalog::find_by_name(const std::wstring& display_name) const
 {
     const std::string want = narrow(display_name);
     for (size_t i = 0; i < voices_.size(); ++i) {
-        if (_stricmp(voices_[i].display_name.c_str(), want.c_str()) == 0) {
+        const Voice& v = voices_[i];
+        const std::string old_name = "Infovox 1.12 " + v.mode_key;
+        if (_stricmp(v.display_name.c_str(), want.c_str()) == 0 ||
+            (!v.user_defined && _stricmp(old_name.c_str(), want.c_str()) == 0)) {
             return static_cast<int>(i);
         }
     }

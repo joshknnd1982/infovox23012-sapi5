@@ -95,7 +95,7 @@ def to_lcid(language_id):
 # list next to other vendors' voices, and the version distinguishes it from the
 # Infovox 230 v2.2 voices, which can be installed at the same time.
 def display_name(mode_name):
-    return "Infovox 1.12 " + mode_name
+    return "Infovox230 1.12 " + mode_name
 
 
 def c_str(s):

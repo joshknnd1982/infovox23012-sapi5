@@ -6,6 +6,7 @@
 
 #include "ivx_log.h"
 #include "ivx_paths.h"
+#include "ivx_pitch.h"
 
 namespace ivx {
 namespace config {
@@ -215,11 +216,23 @@ void VoiceFile::load(Scope scope)
         VoiceEdit edit;
         edit.name = name;
         edit.from_file = true;
-        edit.builtin = catalog().find_by_name(name) >= 0 &&
-                       !catalog().voices()[static_cast<size_t>(catalog().find_by_name(name))]
-                            .user_defined;
+        const std::vector<Voice>& voices = catalog().voices();
+        const int known = catalog().find_by_name(name);
+        edit.builtin = known >= 0 && !voices[static_cast<size_t>(known)].user_defined;
+        if (edit.builtin) {
+            edit.name = widen(voices[static_cast<size_t>(known)].display_name);
+            if (_wcsicmp(edit.name.c_str(), name.c_str()) != 0) {
+                removed_.push_back(name);
+            }
+        }
         for (int key = 0; key < KEY_COUNT; ++key) {
             edit.values[key] = read_key(path_, name, kVoiceKeyNames[key]);
+        }
+        if (edit.has(KEY_BASED_ON)) {
+            const int base = catalog().find_by_name(edit.get(KEY_BASED_ON));
+            if (base >= 0) {
+                edit.set(KEY_BASED_ON, widen(voices[static_cast<size_t>(base)].display_name));
+            }
         }
         entries_.push_back(edit);
     }
@@ -334,6 +347,7 @@ bool VoiceFile::save(std::wstring* error)
         {settings_key::kWordEvents, settings_.word_events},
         {settings_key::kSentenceEvents, settings_.sentence_events},
         {settings_key::kCollapseRepeatedPunctuation, settings_.collapse_repeated_punctuation},
+        {settings_key::kControlTags, settings_.control_tags},
     };
     for (const Flag& item : flags) {
         ok = write_key(path_, section, item.key, item.value ? L"1" : L"0", &problem) && ok;
@@ -474,26 +488,12 @@ std::wstring inherited_value(const VoiceEdit& edit, int key)
 
 int pitch_to_hertz(int pitch)
 {
-    const int hertz = 3 * pitch - 49;
-    if (hertz < 30) {
-        return 30;
-    }
-    if (hertz > 250) {
-        return 250;
-    }
-    return hertz;
+    return ivx::pitch::reported_hertz(pitch);
 }
 
 int hertz_to_pitch(int hertz)
 {
-    const int pitch = (hertz + 49 + 1) / 3;
-    if (pitch < 27) {
-        return 27;
-    }
-    if (pitch > 99) {
-        return 99;
-    }
-    return pitch;
+    return ivx::pitch::selected_param(hertz);
 }
 
 const wchar_t* formant_description(int formant)

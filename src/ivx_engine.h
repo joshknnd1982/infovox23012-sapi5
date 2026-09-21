@@ -105,7 +105,7 @@ public:
     int pitch_max() const { return pitch_max_; }
     int pitch_default() const { return pitch_default_; }
 
-    // `tagged` is control-tagged text: \Spd=wpm\ \Pit=hz\ \Vol=dword\ \mrk=n\.
+    // `tagged` is control-tagged text: \Spd=wpm\ \Pit=n\ \Vol=dword\ \mrk=n\.
     // Returns false if the engine never signalled completion.
     bool speak(const std::wstring& tagged, const PcmSink& on_pcm, const EventSink& on_event,
                const CancelCheck& cancelled, unsigned timeout_ms);

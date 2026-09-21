@@ -214,6 +214,11 @@ BEGIN
     LTEXT           "Sentence spoken by &Preview:", -1, 243, 144, 206, 8
     EDITTEXT        IDC_E_PREVIEW_TEXT, 243, 156, 206, 12, ES_AUTOHSCROLL | WS_TABSTOP
 
+    GROUPBOX        "Text", -1, 236, 180, 220, 36
+    CONTROL         "Obey the engine's own control t&ags in the text, such as \\Pit=30\\",
+                    IDC_E_CONTROL_TAGS, "Button", BS_AUTOCHECKBOX | BS_MULTILINE | WS_TABSTOP,
+                    243, 192, 206, 18
+
     LTEXT           "About t&hese settings (read only):", -1, 7, 276, 200, 8
     EDITTEXT        IDC_E_HINT, 7, 286, 449, 42,
                     ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL | WS_TABSTOP

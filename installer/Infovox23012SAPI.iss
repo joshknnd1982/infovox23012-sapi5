@@ -157,7 +157,7 @@ Name: "desktopicon"; \
 [Icons]
 Name: "{group}\Infovox 230 v1.12 Configuration"; Filename: "{app}\Infovox23012Config.exe"; Comment: "Define your own voices and change every engine setting"
 Name: "{autodesktop}\Infovox 230 v1.12 Configuration"; Filename: "{app}\Infovox23012Config.exe"; Comment: "Define your own voices and change every engine setting"; Tasks: desktopicon
-Name: "{group}\Speak a test sentence";  Filename: "{app}\Infovox23012SapiTest.exe"; Parameters: "say"; Comment: "Speaks aloud with the first Infovox voice, to check the voices are working"
+Name: "{group}\Speak a test sentence";  Filename: "{app}\Infovox23012SapiTest.exe"; Parameters: "say"; Comment: "Says how many Infovox voices are installed, to check they are working"
 Name: "{group}\List the Infovox voices"; Filename: "{app}\Infovox23012Diag.exe"; Parameters: "list"; Comment: "Lists every installed voice and its language"
 Name: "{group}\Refresh the voice list";  Filename: "{sys}\regsvr32.exe"; Parameters: "/s ""{app}\Infovox23012SAPI.dll"""; Comment: "Republishes the voices after editing voices.ini"
 Name: "{group}\Read me";                 Filename: "{app}\README.txt"; Comment: "How the voices work, and how to add your own"

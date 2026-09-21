@@ -3,6 +3,7 @@
 #include <sapi.h>
 #include <sperror.h>
 
+#include <set>
 #include <string>
 #include <vector>
 
@@ -36,12 +37,24 @@ std::wstring widen(const std::string& s)
 // awkward to type when someone is reading a log out loud.
 std::wstring token_name(const Voice& voice)
 {
+    std::wstring shown = voice.sapi_name();
+    const std::wstring product = L"Infovox230 1.12 ";
+    if (_wcsnicmp(shown.c_str(), product.c_str(), product.size()) == 0) {
+        shown.erase(0, product.size());
+    }
     std::wstring name = kTokenPrefix;
-    for (wchar_t ch : voice.sapi_name()) {
+    for (wchar_t ch : shown) {
         name += (ch == L' ' || ch == L'\\' || ch == L'/') ? L'_' : ch;
     }
     return name;
 }
+
+struct NoCase {
+    bool operator()(const std::wstring& a, const std::wstring& b) const
+    {
+        return _wcsicmp(a.c_str(), b.c_str()) < 0;
+    }
+};
 
 }  // namespace
 
@@ -66,9 +79,14 @@ bool register_voices(HKEY root)
     const std::wstring clsid = com::clsid_string(__uuidof(TtsEngine));
     const Catalog& catalog = shared_catalog();
 
+    std::set<std::wstring, NoCase> taken;
     int written = 0;
     for (const Voice& voice : catalog.voices()) {
-        const std::wstring key = std::wstring(kVoicesKey) + L"\\" + token_name(voice);
+        std::wstring token = token_name(voice);
+        for (int n = 2; !taken.insert(token).second; ++n) {
+            token = token_name(voice) + L"_" + std::to_wstring(n);
+        }
+        const std::wstring key = std::wstring(kVoicesKey) + L"\\" + token;
         const std::wstring name = voice.sapi_name();
 
         // The unnamed value is the fallback display name; the value named after

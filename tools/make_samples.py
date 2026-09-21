@@ -59,7 +59,7 @@ def list_voices():
     for line in out.splitlines():
         if "0x" not in line or not line.startswith("Infovox"):
             continue
-        # "Infovox American English Male  0x0409  Male  Adult  {guid}"
+        # "Infovox230 1.12 American English Male  0x0409  Male  Adult  {guid}"
         marker = line.index("0x")
         name = line[:marker].strip()
         rest = line[marker:].split()
@@ -121,7 +121,7 @@ def main():
         sentence = SAMPLES.get(voice["lcid"], "This is a test.")
         # The name first, spoken by the voice itself: that is what makes one
         # speaker tellable from another by ear.
-        text = "%s. %s" % (voice["name"].replace("Infovox ", ""), sentence)
+        text = "%s. %s" % (voice["name"].replace("Infovox230 1.12 ", ""), sentence)
         path = os.path.join(voices_dir, voice["name"].replace(" ", "_") + ".wav")
         if not render(voice, text, path, args.direct):
             continue

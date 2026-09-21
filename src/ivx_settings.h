@@ -60,6 +60,8 @@ struct EngineSettings {
     bool word_events = true;
     bool sentence_events = true;
 
+    bool control_tags = true;
+
     // How long an utterance may take before a wedged engine is given up on:
     // this many milliseconds, plus this many per character of text.
     int timeout_base_ms = 30000;
@@ -95,6 +97,7 @@ extern const wchar_t kCollapseRepeatedPunctuation[];
 extern const wchar_t kOnsetFadeMs[];
 extern const wchar_t kWordEvents[];
 extern const wchar_t kSentenceEvents[];
+extern const wchar_t kControlTags[];
 extern const wchar_t kTimeoutBaseMs[];
 extern const wchar_t kTimeoutPerCharMs[];
 extern const wchar_t kRateMin[];

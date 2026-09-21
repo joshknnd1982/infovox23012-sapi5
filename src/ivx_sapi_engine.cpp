@@ -5,6 +5,7 @@
 
 #include "ivx_log.h"
 #include "ivx_sapi_tokens.h"
+#include "ivx_tags.h"
 
 namespace ivx {
 namespace sapi5 {
@@ -110,6 +111,79 @@ void append_tag(std::wstring& tagged, std::vector<uint32_t>& source, const std::
 {
     tagged += tag;
     source.insert(source.end(), tag.size(), kNotFromSource);
+}
+
+constexpr unsigned long kLongestTagPauseMs = 60000;
+
+std::string lowered(std::string s)
+{
+    if (!s.empty()) {
+        CharLowerBuffA(&s[0], static_cast<DWORD>(s.size()));
+    }
+    return s;
+}
+
+std::string without_language(const Voice& voice)
+{
+    return lowered(voice.mode_key.substr((std::min)(voice.language_name.size(),
+                                                    voice.mode_key.size())));
+}
+
+std::string language_named(const std::wstring& language, const std::wstring& accent)
+{
+    const std::string name = lowered(narrow(language));
+    if (name == "english") {
+        return lowered(narrow(accent)) == "american" ? "american english" : "british english";
+    }
+    if (name == "american" || name == "british") {
+        return name + " english";
+    }
+    if (name == "spanish") {
+        return "castilian spanish";
+    }
+    return name;
+}
+
+std::string voice_for(const tags::Token& token, const std::string& current)
+{
+    const Catalog& catalog = shared_catalog();
+    const std::vector<Voice>& voices = catalog.voices();
+
+    if (!token.speaker.empty()) {
+        const std::string wanted = lowered(narrow(token.speaker));
+        for (const Voice& v : voices) {
+            if (lowered(v.display_name) == wanted || lowered(v.mode_key) == wanted) {
+                return v.mode_guid;
+            }
+        }
+        for (const Voice& v : voices) {
+            if (lowered(v.display_name).find(wanted) != std::string::npos ||
+                lowered(v.mode_key).find(wanted) != std::string::npos) {
+                return v.mode_guid;
+            }
+        }
+    }
+
+    if (!token.language.empty()) {
+        const std::string wanted = language_named(token.language, token.accent);
+        const int now = catalog.find_by_mode_guid(current);
+        const std::string role =
+            now >= 0 ? without_language(voices[static_cast<size_t>(now)]) : std::string();
+        std::string first;
+        for (const Voice& v : voices) {
+            if (lowered(v.language_name) != wanted) {
+                continue;
+            }
+            if (without_language(v) == role) {
+                return v.mode_guid;
+            }
+            if (first.empty()) {
+                first = v.mode_guid;
+            }
+        }
+        return first;
+    }
+    return std::string();
 }
 
 }  // namespace
@@ -649,11 +723,12 @@ HRESULT TtsEngine::run_action(const Action& action, ISpTTSEngineSite* site)
         settings_.timeout_base_ms +
         static_cast<long long>(run.tagged.size()) * settings_.timeout_per_char_ms);
 
+    const std::string& mode = run.mode_guid.empty() ? mode_guid_ : run.mode_guid;
     DoneResponse done = {};
     bool ok;
     if (action.kind == Action::Phonemes) {
         PhonemeRequest request = {};
-        strncpy_s(request.mode_guid, mode_guid_.c_str(), _TRUNCATE);
+        strncpy_s(request.mode_guid, mode.c_str(), _TRUNCATE);
         request.rate_step = run.rate_step;
         request.pitch_step = run.pitch_step;
         request.volume_pct = run.volume_pct;
@@ -662,7 +737,7 @@ HRESULT TtsEngine::run_action(const Action& action, ISpTTSEngineSite* site)
         ok = client_.speak_phonemes(request, run.tagged, on_audio, on_format, &done);
     } else {
         SpeakRequest request = {};
-        strncpy_s(request.mode_guid, mode_guid_.c_str(), _TRUNCATE);
+        strncpy_s(request.mode_guid, mode.c_str(), _TRUNCATE);
         request.rate_step = run.rate_step;
         request.pitch_step = run.pitch_step;
         request.volume_pct = run.volume_pct;
@@ -737,6 +812,46 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
         current_started = false;
     };
 
+    tags::Carried carried;
+    std::string voice = mode_guid_;
+    bool have_last = false;
+    int last_rate = 0;
+    int last_pitch = 0;
+    int last_volume = 0;
+
+    auto begin_piece = [&](int rate_step, int pitch_step, int volume_pct) {
+        if (current_started) {
+            return;
+        }
+        current = Action();
+        current.run.mode_guid = voice;
+        current.run.rate_step = rate_step;
+        current.run.pitch_step = pitch_step;
+        current.run.volume_pct = volume_pct;
+        current_started = true;
+        if (have_last) {
+            carried.yield_to((rate_step != last_rate ? tags::effect::kRate : 0u) |
+                             (pitch_step != last_pitch ? tags::effect::kPitch : 0u) |
+                             (volume_pct != last_volume ? tags::effect::kVolume : 0u));
+        }
+        have_last = true;
+        last_rate = rate_step;
+        last_pitch = pitch_step;
+        last_volume = volume_pct;
+        const std::wstring again = carried.tags();
+        if (!again.empty()) {
+            append_tag(current.run.tagged, current.run.source, again);
+        }
+    };
+
+    auto add_bookmark = [&](const std::wstring& name) {
+        bookmarks_.push_back(name);
+        wchar_t tag[24];
+        _snwprintf_s(tag, _countof(tag), _TRUNCATE, L"\\mrk=%u\\",
+                     static_cast<unsigned>(bookmarks_.size() - 1 + kFirstBookmark));
+        append_tag(current.run.tagged, current.run.source, tag);
+    };
+
     for (const SPVTEXTFRAG* frag = fragments; frag; frag = frag->pNext) {
         const int rate_step = clamp(base_rate + frag->State.RateAdj, -10, 10);
         const int pitch_step = clamp(frag->State.PitchAdj.MiddleAdj, -10, 10);
@@ -761,6 +876,7 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
                 Action phonemes;
                 phonemes.kind = Action::Phonemes;
                 phonemes.ipa = true;  // SAPI5 phoneme ids are IPA code points
+                phonemes.run.mode_guid = voice;
                 phonemes.run.rate_step = rate_step;
                 phonemes.run.pitch_step = pitch_step;
                 phonemes.run.volume_pct = volume_pct;
@@ -778,22 +894,12 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
                 if (prosody_changed) {
                     flush();
                 }
-                if (!current_started) {
-                    current = Action();
-                    current.run.rate_step = rate_step;
-                    current.run.pitch_step = pitch_step;
-                    current.run.volume_pct = volume_pct;
-                    current_started = true;
-                }
+                begin_piece(rate_step, pitch_step, volume_pct);
                 std::wstring name;
                 if (frag->pTextStart && frag->ulTextLen) {
                     name.assign(frag->pTextStart, frag->ulTextLen);
                 }
-                bookmarks_.push_back(name);
-                wchar_t tag[24];
-                _snwprintf_s(tag, _countof(tag), _TRUNCATE, L"\\mrk=%u\\",
-                             static_cast<unsigned>(bookmarks_.size() - 1 + kFirstBookmark));
-                append_tag(current.run.tagged, current.run.source, tag);
+                add_bookmark(name);
                 continue;
             }
 
@@ -812,13 +918,6 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
         if (prosody_changed) {
             flush();
         }
-        if (!current_started) {
-            current = Action();
-            current.run.rate_step = rate_step;
-            current.run.pitch_step = pitch_step;
-            current.run.volume_pct = volume_pct;
-            current_started = true;
-        }
 
         if (want_sentences) {
             // Queued against the audio produced so far, which is where this
@@ -835,14 +934,66 @@ STDMETHODIMP TtsEngine::Speak(DWORD flags, REFGUID, const WAVEFORMATEX*,
         if (frag->State.eAction == SPVA_SpellOut) {
             // The engine's letter mode tag does nothing (measured), so spelling
             // is done by separating the characters here.
+            begin_piece(rate_step, pitch_step, volume_pct);
             for (ULONG i = 0; i < frag->ulTextLen; ++i) {
                 append_text(current.run.tagged, current.run.source, frag->pTextStart + i, 1,
                             frag->ulTextSrcOffset + i, false);
                 append_tag(current.run.tagged, current.run.source, L" ");
             }
-        } else {
+        } else if (!settings_.control_tags) {
+            begin_piece(rate_step, pitch_step, volume_pct);
             append_text(current.run.tagged, current.run.source, frag->pTextStart, frag->ulTextLen,
                         frag->ulTextSrcOffset, settings_.collapse_repeated_punctuation);
+        } else {
+            for (const tags::Token& token : tags::scan(frag->pTextStart, frag->ulTextLen)) {
+                const wchar_t* at = frag->pTextStart + token.begin;
+                switch (token.kind) {
+                    case tags::Kind::Text:
+                        begin_piece(rate_step, pitch_step, volume_pct);
+                        append_text(current.run.tagged, current.run.source, at,
+                                    static_cast<ULONG>(token.length),
+                                    frag->ulTextSrcOffset + static_cast<ULONG>(token.begin),
+                                    settings_.collapse_repeated_punctuation);
+                        break;
+                    case tags::Kind::Engine:
+                        begin_piece(rate_step, pitch_step, volume_pct);
+                        append_tag(current.run.tagged, current.run.source, token.tag);
+                        carried.note(token.effects, token.tag);
+                        break;
+                    case tags::Kind::Voice: {
+                        const std::string chosen = voice_for(token, voice);
+                        if (chosen.empty() && (!token.speaker.empty() || !token.language.empty())) {
+                            IVX_WARN("sapi: no installed voice answers to \\Vce=%S\\",
+                                     token.value.c_str());
+                        } else if (!chosen.empty() &&
+                                   _stricmp(chosen.c_str(), voice.c_str()) != 0) {
+                            IVX_DEBUG("sapi: \\Vce= in the text: %s -> %s", voice.c_str(),
+                                      chosen.c_str());
+                            flush();
+                            voice = chosen;
+                            carried.forget(tags::effect::kPitch | tags::effect::kVoiceParams);
+                        }
+                        if (!token.tag.empty()) {
+                            begin_piece(rate_step, pitch_step, volume_pct);
+                            append_tag(current.run.tagged, current.run.source, token.tag);
+                            carried.note(token.effects, token.tag);
+                        }
+                        break;
+                    }
+                    case tags::Kind::Bookmark:
+                        begin_piece(rate_step, pitch_step, volume_pct);
+                        add_bookmark(token.value);
+                        break;
+                    case tags::Kind::Pause: {
+                        flush();
+                        Action silence;
+                        silence.kind = Action::Silence;
+                        silence.silence_ms = (std::min)(token.number, kLongestTagPauseMs);
+                        plan.push_back(silence);
+                        break;
+                    }
+                }
+            }
         }
     }
     flush();

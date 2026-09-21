@@ -140,8 +140,7 @@ void reload_catalog();
 // built-in voice.
 std::wstring inherited_value(const VoiceEdit& edit, int key);
 
-// Base pitch to hertz, which is the number a person can actually judge. The
-// engine computes 3 x Pitch - 49 and clamps the result to 30..250 Hz.
+// Base pitch to hertz, which is the number a person can actually judge.
 int pitch_to_hertz(int pitch);
 int hertz_to_pitch(int hertz);
 

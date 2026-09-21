@@ -385,6 +385,30 @@ from.
 What changed
 ------------
 
+1.0.7  Control tags in the text, and every voice at its proper pitch.
+       Contributed by Aksel Christoffersen.
+
+       Every voice spoke at the wrong pitch: the male voices lower than
+       they should, the female and child voices higher. The pitch was
+       handed to the engine in hertz, in a tag that does not take hertz.
+       It is now set exactly as the engine's own pitch control sets it.
+
+       The engine's own control tags can be written into the text, as
+       SAPI 4 programs allowed -- \Pit=30\ for a very deep voice, for
+       instance. See "What you can control" above; they can be turned off
+       under Engine settings in the configuration utility.
+
+       The voices are now called "Infovox230 1.12 American English Male"
+       and so on, so they can be told apart from other Infovox voices.
+       Anything in voices.ini written with the old names still works. A
+       program that remembers which voice you chose may need to be told
+       again after upgrading, because the voices' names in Windows
+       changed with them.
+
+       Speak a test sentence, and the test at the end of setup, now say
+       how many voices and languages are installed, rather than always
+       sixty in twelve, and count only this product's voices.
+
 1.0.6  No more hiss in place of speech when the volume is turned down.
 
        With the volume below 100%, speech could stop part-way through and
